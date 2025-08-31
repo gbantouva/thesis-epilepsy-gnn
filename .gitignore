@@ -15,6 +15,10 @@ figures/
 *.jpg
 *.svg
 
+.ipynb_checkpoints/
+.notebooks/
+
+
 # Ignore Python cache
 __pycache__/
 *.pyc
