@@ -13,18 +13,18 @@
 
 ```mermaid
 flowchart LR
-    A[Raw EEG (EDF) data_raw/DATA/...]
-    B[Standardized Raw]
-    C[Preprocessed Continuous]
-    D[Harmonized Continuous]
-    E[Epochs]
-    F[Clean Epochs (z-score)]
-    G[Labels (0/1) per epoch]
-    H[Save ML-ready arrays: data_pp/*_epochs.npy, *_labels.npy, *_raw.npy, *_info.pkl]
-    P1[figures/psd/*_PSD_before.png]
-    P2[figures/psd/*_PSD_after.png]
-    I[Downstream: features, connectivity → graphs, models]
-    J[Notebooks for figures (notebooks/*.ipynb)]
+    A["Raw EEG (EDF) data_raw/DATA/..."]
+    B["Standardized Raw"]
+    C["Preprocessed Continuous"]
+    D["Harmonized Continuous"]
+    E["Epochs"]
+    F["Clean Epochs (z-score)"]
+    G["Labels (0/1) per epoch"]
+    H["Save ML-ready arrays: data_pp/*_epochs.npy, *_labels.npy, *_raw.npy, *_info.pkl"]
+    P1["figures/psd/*_PSD_before.png"]
+    P2["figures/psd/*_PSD_after.png"]
+    I["Downstream: features, connectivity → graphs, models"]
+    J["Notebooks for figures (notebooks/*.ipynb)"]
 
     A -->|select EEG, clean names, pick core 10-20| B
     B -->|set montage, CAR, notch, band-pass, (optional ICA)| C
@@ -37,10 +37,6 @@ flowchart LR
     C -.->|PSD AFTER (QC)| P2
     H --> I
     I --> J
-
-
-
-
 
 Usage:
 ```bash
