@@ -7,8 +7,11 @@
 - `src/`       → Python scripts
 - `notebooks/` → Jupyter notebooks for exploratory analysis
 
-## Preprocessing a single EDF
+---
 
+## Preprocessing Workflow
+
+```mermaid
 flowchart LR
     A[Raw EEG (EDF)\n data_raw/DATA/...] -->|select EEG, clean names, pick core 10-20| B[Standardized Raw]
     B -->|set montage, CAR, notch, band-pass, (optional ICA)| C[Preprocessed Continuous]
@@ -21,6 +24,7 @@ flowchart LR
     C -.->|PSD AFTER (QC)| P2[figures/psd/<id>_PSD_after.png]
     H --> I[Downstream: features, connectivity → graphs, models]
     I --> J[Notebooks for figures\n(notebooks/*.ipynb)]
+
 
 
 Usage:
