@@ -9,14 +9,6 @@
 
 ## Preprocessing a single EDF
 
-Usage:
-```bash
-python src/preprocess_single.py \
-  --edf "data_raw/DATA/01_no_epilepsy/aaaaafiy/s002_2010/01_tcp_ar/aaaaafiy_s002_t001.edf" \
-  --out "data_pp" \
-  --psd_dir "figures/psd"
-
-
 flowchart LR
     A[Raw EEG (EDF)\n data_raw/DATA/...] -->|select EEG, clean names, pick core 10-20| B[Standardized Raw]
     B -->|set montage, CAR, notch, band-pass, (optional ICA)| C[Preprocessed Continuous]
@@ -29,3 +21,12 @@ flowchart LR
     C -.->|PSD AFTER (QC)| P2[figures/psd/<id>_PSD_after.png]
     H --> I[Downstream: features, connectivity → graphs, models]
     I --> J[Notebooks for figures\n(notebooks/*.ipynb)]
+
+
+Usage:
+```bash
+python src/preprocess_single.py \
+  --edf "data_raw/DATA/01_no_epilepsy/aaaaafiy/s002_2010/01_tcp_ar/aaaaafiy_s002_t001.edf" \
+  --out "data_pp" \
+  --psd_dir "figures/psd"
+
