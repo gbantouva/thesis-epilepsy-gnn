@@ -4,6 +4,17 @@ data_raw/
 *.npy
 *.pkl
 
+# Ignore preprocessed outputs
+data_pp/
+*.npy
+*.pkl
+
+# Ignore figures/plots
+figures/
+*.png
+*.jpg
+*.svg
+
 # Ignore Python cache
 __pycache__/
 *.pyc
@@ -11,3 +22,7 @@ __pycache__/
 # Ignore virtual env
 .venv/
 env/
+
+
+# Ignore logs if they get large
+logs/
