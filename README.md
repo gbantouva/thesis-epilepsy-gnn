@@ -13,17 +13,31 @@
 
 ```mermaid
 flowchart LR
-    A[Raw EEG (EDF) data_raw/DATA/...] -->|select EEG, clean names, pick core 10-20| B[Standardized Raw]
-    B -->|set montage, CAR, notch, band-pass, (optional ICA)| C[Preprocessed Continuous]
-    C -->|resample to 250 Hz (optional crop 10s for controls)| D[Harmonized Continuous]
-    D -->|fixed 2s windows| E[Epochs]
-    E -->|artifact rejection (peak-to-peak, 95th pct)| F[Clean Epochs (z-score)]
-    A -.->|group label (folder name)| G[Labels (0/1) per epoch]
-    F --> H[Save ML-ready arrays: data_pp/*_epochs.npy, *_labels.npy, *_raw.npy, *_info.pkl]
-    B -.->|PSD BEFORE (QC)| P1[figures/psd/*_PSD_before.png]
-    C -.->|PSD AFTER (QC)| P2[figures/psd/*_PSD_after.png]
-    H --> I[Downstream: features, connectivity → graphs, models]
-    I --> J[Notebooks for figures (notebooks/*.ipynb)]
+    A[Raw EEG (EDF) data_raw/DATA/...]
+    B[Standardized Raw]
+    C[Preprocessed Continuous]
+    D[Harmonized Continuous]
+    E[Epochs]
+    F[Clean Epochs (z-score)]
+    G[Labels (0/1) per epoch]
+    H[Save ML-ready arrays: data_pp/*_epochs.npy, *_labels.npy, *_raw.npy, *_info.pkl]
+    P1[figures/psd/*_PSD_before.png]
+    P2[figures/psd/*_PSD_after.png]
+    I[Downstream: features, connectivity → graphs, models]
+    J[Notebooks for figures (notebooks/*.ipynb)]
+
+    A -->|select EEG, clean names, pick core 10-20| B
+    B -->|set montage, CAR, notch, band-pass, (optional ICA)| C
+    C -->|resample to 250 Hz (optional crop 10s for controls)| D
+    D -->|fixed 2s windows| E
+    E -->|artifact rejection (peak-to-peak, 95th pct)| F
+    A -.->|group label (folder name)| G
+    F --> H
+    B -.->|PSD BEFORE (QC)| P1
+    C -.->|PSD AFTER (QC)| P2
+    H --> I
+    I --> J
+
 
 
 
