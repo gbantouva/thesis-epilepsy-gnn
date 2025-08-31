@@ -37,11 +37,11 @@ flowchart LR
     C -.-> P2
     H --> I
     I --> J
-```` ``` ````  
+````
 
 ```` ```bash ````
 python src/preprocess_single.py \
   --edf "data_raw/DATA/01_no_epilepsy/aaaaafiy/s002_2010/01_tcp_ar/aaaaafiy_s002_t001.edf" \
   --out "data_pp" \
   --psd_dir "figures/psd"
-  ```` ``` ````  
+  ````
