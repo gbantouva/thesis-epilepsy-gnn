@@ -28,6 +28,9 @@ This repository contains the code, preprocessing pipeline, and experiments for m
 - `preprocess_single_edf.py` → script for batch preprocessing
 - Output: `_raw.npy`, `_epochs.npy`, `_labels.npy`, `_info.pkl`
 
+## Documentation
+- [Methods](./METHODS.md)
+
 ## Citation
 If you use this code, please cite:  
 Zhao et al. (2023). *Self-supervised learning for epileptic EEG analysis using graph neural networks.* arXiv:2311.03764
