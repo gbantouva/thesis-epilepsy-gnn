@@ -7,21 +7,21 @@ This repository contains the code, preprocessing pipeline, and experiments for m
 - 100 epilepsy subjects, 100 non-epilepsy subjects.
 
 ## Preprocessing Pipeline
-1. Load EDF, keep EEG only
+1. Load EDF, keep EEG channels only
 2. Clean channel names
 3. Core 10–20 channel selection
-4. Apply montage (+T1/T2)
+4. Apply standard montage (+T1/T2 if present)
 5. Common average reference
-6. Notch @ 60 Hz
-7. Bandpass (0.5–100 Hz)
-8. ICA for artifact removal
-9. PSD plots
+6. Notch filter @ 60 Hz
+7. Bandpass filter (0.5–100 Hz)
+8. ICA for artifact removal (components can be inspected; not applied automatically)
+9. Diagnostic plots (time series & PSD before/after preprocessing)
 10. Resample (250 Hz)
 11. Crop first 10s (non-epilepsy only)
-12. Epoch into 2s windows
+12. Epoch into 2s windows (no overlap)
 13. Artifact rejection (95th percentile)
-14. Z-score normalization
-15. Save outputs
+14. Z-score normalization across channels
+15. Save processed outputs
 
 ## Files
 - `preprocess_single_edf.ipynb` → interactive preprocessing with plots
