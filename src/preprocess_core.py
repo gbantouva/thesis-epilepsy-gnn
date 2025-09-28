@@ -15,7 +15,7 @@ def clean_channel_names(raw):
 def set_montage_with_T1T2(raw):
     std = mne.channels.make_standard_montage('standard_1020')
     pos = std.get_positions()['ch_pos']
-    pos.update({'T1': [-0.060,-0.090,0.120], 'T2': [0.060,-0.090,0.120]})
+    pos.update({'T1': [-0.040,-0.090,0.120], 'T2': [0.040,-0.090,0.120]})
     raw.set_montage(mne.channels.make_dig_montage(ch_pos=pos, coord_frame='head'), match_case=False)
 
 def infer_label_from_path(p: Path) -> int:
