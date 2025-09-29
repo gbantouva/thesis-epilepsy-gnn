@@ -56,5 +56,5 @@ Run the `preprocess_single.py` script from your repository root using the comman
 # Run from the repository root (e.g., C:\...\thesis-epilepsy-gnn)
 python src\preprocess_single.py `
     --edf "data_raw\DATA\00_epilepsy\aaaaaanr\s001_2003\02_tcp_le\aaaaaanr_s001_t001.edf" `
-    --out "data_pp" `
-    --psd_dir "figures\psd"
+    --out "C:\Users\georg\Documents\GitHub\thesis-epilepsy-gnn\data_pp" `
+    --psd_dir "C:\Users\georg\Documents\GitHub\thesis-epilepsy-gnn\figures\psd"
