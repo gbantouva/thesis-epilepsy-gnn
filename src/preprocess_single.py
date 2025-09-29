@@ -35,6 +35,7 @@ def main(edf:str, out:str, psd_dir:str):
         if psd is None: continue
         fig = psd.plot(show=False); fig.suptitle(f"PSD {tag.upper()}"); fig.savefig(psd_dir / f"{pid}_PSD_{tag}.png", dpi=150, bbox_inches="tight"); plt.close(fig)
 
+
     print(f"Saved epochs={len(res['epochs'])}, thr={res['threshold_uv']:.1f} µV")
 
 if __name__ == "__main__":
