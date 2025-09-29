@@ -1,4 +1,30 @@
 # src/preprocess_core.py
+
+# EEG Epilepsy Preprocessing Pipeline
+
+#This repository contains a reproducible EEG preprocessing pipeline for epilepsy detection using the Temple University Hospital (TUH) EEG Epilepsy Corpus.
+
+## Overview
+
+#The pipeline processes raw EEG recordings in EDF format by applying:
+
+#- Channel cleaning and standard 10-20 electrode montage assignment  
+#- Average referencing, notch filtering at 60 Hz, and bandpass filtering (0.5–100 Hz)  
+#- Optional ICA artifact removal (disabled by default)  
+#- Resampling to 250 Hz and optional cropping of start segments for controls  
+#- Fixed-length epoching with amplitude-based artifact rejection  
+#- Per-epoch, per-channel z-score normalization  
+#- Label extraction from filename conventions indicating epileptic vs non-epileptic status  
+#- Optional power spectral density (PSD) computation before and after preprocessing  
+
+#Processed epochs, labels, raw data, metadata, and PSD plots are saved for downstream machine learning and graph-based analyses.
+
+## Running the Pipeline
+
+#The core preprocessing logic is in `src/preprocess_core.py`. To preprocess a single EDF file and save outputs (epochs, labels, raw data, PSD plots), run:
+
+#python src/preprocess_single.py --edf path/to/file.edf --out path/to/output_dir --psd_dir path/to/psd_figures
+
 from pathlib import Path
 import re, pickle, numpy as np, mne
 from mne.preprocessing import ICA
@@ -49,8 +75,8 @@ def preprocess_single(
     if ica_components:
         ica = ICA(n_components=min(20, len(raw.ch_names)), method='fastica', random_state=42)
         ica.fit(raw)
-        ica.exclude = sorted(set(ica_components))
-        ica.apply(raw)
+        #ica.exclude = sorted(set(ica_components))
+        #ica.apply(raw)
 
     # Resample & optional crop
     raw.resample(resample_hz, npad="auto")
@@ -66,8 +92,15 @@ def preprocess_single(
     epochs_clean = epochs.copy().drop_bad(reject=dict(eeg=thr_uv * 1e-6))
 
     # Z-score
-    Xc = epochs_clean.get_data()
-    m, s = Xc.mean(), Xc.std() if Xc.std() != 0 else 1.0
+    #Xc = epochs_clean.get_data()
+    #m, s = Xc.mean(), Xc.std() if Xc.std() != 0 else 1.0
+    #epochs_clean._data = (Xc - m) / s
+
+    # Z-score per epoch, per channel
+    Xc = epochs_clean.get_data()                     # shape: (n_epochs, n_channels, n_times)
+    m = Xc.mean(axis=2, keepdims=True)              # mean over time (per epoch/ch)
+    s = Xc.std(axis=2, keepdims=True)               # std over time (per epoch/ch)
+    s[s == 0] = 1.0                                 # avoid division by zero
     epochs_clean._data = (Xc - m) / s
 
     # Labels per epoch

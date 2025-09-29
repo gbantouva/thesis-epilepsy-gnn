@@ -1,5 +1,6 @@
 """
 Usage:
+  python src/preprocess_single.py --edf path/to/file.edf --out path/to/output_dir --psd_dir path/to/psd_figures
   python src/preprocess_single.py --edf data_raw/DATA/...t001.edf --out data_pp --psd_dir figures/psd
 """
 import sys
