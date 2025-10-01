@@ -38,10 +38,19 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                 print(f"Processing {edf_file} (patient {patient_id})...")
                 res = preprocess_single(edf_file, return_psd=True)
                 
-                np.save(output_path / f"{pid_full}_epochs.npy", res["epochs"].get_data())
-                np.save(output_path / f"{pid_full}_labels.npy", res["labels"])
-                np.save(output_path / f"{pid_full}_raw.npy", res["raw_after"].get_data())
-                with open(output_path / f"{pid_full}_info.pkl", "wb") as f:
+                # Compute relative path to preserve folder structure
+                relative_path = edf_file.parent.relative_to(input_path)
+                
+                output_subdir = output_path / relative_path
+                psd_subdir = psd_path / relative_path
+                
+                output_subdir.mkdir(parents=True, exist_ok=True)
+                psd_subdir.mkdir(parents=True, exist_ok=True)
+
+                np.save(output_subdir / f"{pid_full}_epochs.npy", res["epochs"].get_data())
+                np.save(output_subdir / f"{pid_full}_labels.npy", res["labels"])
+                np.save(output_subdir / f"{pid_full}_raw.npy", res["raw_after"].get_data())
+                with open(output_subdir / f"{pid_full}_info.pkl", "wb") as f:
                     pickle.dump(res["raw_after"].info, f)
                 
                 for tag, psd in [("before", res.get("psd_before")), ("after", res.get("psd_after"))]:
@@ -49,7 +58,7 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                         continue
                     fig = psd.plot(show=False)
                     fig.suptitle(f"PSD {tag.upper()} {pid_full}")
-                    fig.savefig(psd_path / f"{pid_full}_PSD_{tag}.png", dpi=150, bbox_inches="tight")
+                    fig.savefig(psd_subdir / f"{pid_full}_PSD_{tag}.png", dpi=150, bbox_inches="tight")
                     plt.close(fig)
                 
                 print(f"Finished {pid_full}: saved {len(res['epochs'])} epochs, threshold={res['threshold_uv']:.1f} µV")
