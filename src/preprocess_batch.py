@@ -1,0 +1,76 @@
+import sys
+from pathlib import Path
+import argparse
+import traceback
+from tqdm import tqdm
+
+sys.path.append(str(Path(__file__).resolve().parent))
+
+from preprocess_core import preprocess_single
+
+
+def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None):
+    input_path = Path(input_dir)
+    output_path = Path(output_dir)
+    psd_path = Path(psd_dir)
+    
+    output_path.mkdir(parents=True, exist_ok=True)
+    psd_path.mkdir(parents=True, exist_ok=True)
+    
+    edf_files = list(input_path.rglob("*.edf"))
+    print(f"Found {len(edf_files)} EDF files in {input_path}")
+    
+    processed_patients = set()
+    
+    with tqdm(total=len(edf_files), desc="Processing EDF files") as pbar:
+        for edf_file in edf_files:
+            pid_full = edf_file.stem
+            # Extract patient id from file name - adjust as needed:
+            patient_id = pid_full.split('_')[0]
+            
+            if patient_id not in processed_patients:
+                if max_patients is not None and len(processed_patients) >= max_patients:
+                    print(f"Reached max patient limit: {max_patients}. Stopping.")
+                    break
+                processed_patients.add(patient_id)
+            
+            try:
+                print(f"Processing {edf_file} (patient {patient_id})...")
+                res = preprocess_single(edf_file, return_psd=True)
+                
+                np.save(output_path / f"{pid_full}_epochs.npy", res["epochs"].get_data())
+                np.save(output_path / f"{pid_full}_labels.npy", res["labels"])
+                np.save(output_path / f"{pid_full}_raw.npy", res["raw_after"].get_data())
+                with open(output_path / f"{pid_full}_info.pkl", "wb") as f:
+                    pickle.dump(res["raw_after"].info, f)
+                
+                for tag, psd in [("before", res.get("psd_before")), ("after", res.get("psd_after"))]:
+                    if psd is None:
+                        continue
+                    fig = psd.plot(show=False)
+                    fig.suptitle(f"PSD {tag.upper()} {pid_full}")
+                    fig.savefig(psd_path / f"{pid_full}_PSD_{tag}.png", dpi=150, bbox_inches="tight")
+                    plt.close(fig)
+                
+                print(f"Finished {pid_full}: saved {len(res['epochs'])} epochs, threshold={res['threshold_uv']:.1f} µV")
+            
+            except Exception as e:
+                print(f"Error processing {edf_file}: {e}")
+                traceback.print_exc()
+            
+            pbar.update(1)
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Batch preprocess EDF files with EEG pipeline")
+    ap.add_argument("--input_dir", required=True, help="Root directory containing raw EDF files")
+    ap.add_argument("--output_dir", required=True, help="Directory to save preprocessed outputs")
+    ap.add_argument("--psd_dir", required=True, help="Directory to save PSD plot images")
+    ap.add_argument("--max_patients", type=int, default=None, help="Maximum number of unique patients to process")
+    args = ap.parse_args()
+    
+    import numpy as np
+    import pickle
+    import matplotlib.pyplot as plt
+    
+    main(args.input_dir, args.output_dir, args.psd_dir, max_patients=args.max_patients)
