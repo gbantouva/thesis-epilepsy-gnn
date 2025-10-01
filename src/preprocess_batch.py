@@ -10,6 +10,31 @@ from preprocess_core import preprocess_single
 
 
 def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None):
+    """
+    Batch preprocess EEG EDF files from a root directory recursively.
+
+    Parameters:
+    -----------
+    input_dir : str
+        Root folder containing EEG EDF files and subfolders.
+    output_dir : str
+        Folder to save processed numpy arrays and metadata, preserving input folder structure.
+    psd_dir : str
+        Folder to save PSD plot images, preserving input folder structure.
+    max_patients : int or None
+        If set, limits total unique patients processed by their ID extracted from filename.
+
+    This function:
+    -------------
+    - Recursively finds *.edf files under input_dir.
+    - Extracts patient IDs from filenames.
+    - Processes EDF files incrementally until max_patients is reached.
+    - Calls the core preprocess_single() for each file.
+    - Saves numpy arrays and metadata in relative output folder.
+    - Saves PSD quality control images in relative PSD folder.
+    - Uses tqdm progress bar for feedback.
+    - Handles exceptions per file to continue batch.
+    """
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     psd_path = Path(psd_dir)
@@ -38,7 +63,7 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                 print(f"Processing {edf_file} (patient {patient_id})...")
                 res = preprocess_single(edf_file, return_psd=True)
                 
-                # Compute relative path to preserve folder structure
+                # Preserve folder hierarchy in output and psd dirs
                 relative_path = edf_file.parent.relative_to(input_path)
                 
                 output_subdir = output_path / relative_path
@@ -71,12 +96,12 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Batch preprocess EDF files with EEG pipeline")
-    ap.add_argument("--input_dir", required=True, help="Root directory containing raw EDF files")
-    ap.add_argument("--output_dir", required=True, help="Directory to save preprocessed outputs")
-    ap.add_argument("--psd_dir", required=True, help="Directory to save PSD plot images")
-    ap.add_argument("--max_patients", type=int, default=None, help="Maximum number of unique patients to process")
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser(description="Batch preprocess EEG EDF files for epilepsy dataset")
+    parser.add_argument("--input_dir", required=True, help="Root EEG EDF folder")
+    parser.add_argument("--output_dir", required=True, help="Folder to save preprocessed arrays and metadata")
+    parser.add_argument("--psd_dir", required=True, help="Folder to save PSD plots")
+    parser.add_argument("--max_patients", type=int, default=None, help="Limit unique patients processed")
+    args = parser.parse_args()
     
     import numpy as np
     import pickle
