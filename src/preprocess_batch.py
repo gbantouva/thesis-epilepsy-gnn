@@ -53,6 +53,24 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
             # Extract patient id from file name - adjust as needed:
             patient_id = pid_full.split('_')[0]
             
+            # 1. Determine the expected output path for the epoch file
+            relative_path = edf_file.parent.relative_to(input_path)
+            output_subdir = output_path / relative_path
+            expected_output_file = output_subdir / f"{pid_full}_epochs.npy"
+
+            # 2. Check if the output file already exists
+            if expected_output_file.exists():
+                # Check for patient limit logic, if this is a NEW patient ID we hit.
+                if patient_id not in processed_patients:
+                     processed_patients.add(patient_id)
+
+                # Skip processing the file
+                tqdm.write(f"Skipping {pid_full}: Output already exists.")
+                pbar.update(1)
+                continue # Skip the rest of the loop for this file
+
+
+
             if patient_id not in processed_patients:
                 if max_patients is not None and len(processed_patients) >= max_patients:
                     print(f"Reached max patient limit: {max_patients}. Stopping.")
@@ -64,15 +82,18 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                 res = preprocess_single(edf_file, return_psd=True)
                 
                 # Preserve folder hierarchy in output and psd dirs
-                relative_path = edf_file.parent.relative_to(input_path)
+                #relative_path = edf_file.parent.relative_to(input_path)
                 
-                output_subdir = output_path / relative_path
+                #output_subdir = output_path / relative_path
                 psd_subdir = psd_path / relative_path
                 
                 output_subdir.mkdir(parents=True, exist_ok=True)
                 psd_subdir.mkdir(parents=True, exist_ok=True)
 
-                np.save(output_subdir / f"{pid_full}_epochs.npy", res["epochs"].get_data())
+                #np.save(output_subdir / f"{pid_full}_epochs.npy", res["epochs"].get_data())
+                #np.save(output_subdir / f"{pid_full}_labels.npy", res["labels"])
+                #np.save(output_subdir / f"{pid_full}_raw.npy", res["raw_after"].get_data())
+                np.save(expected_output_file, res["epochs"].get_data()) # Using expected_output_file here
                 np.save(output_subdir / f"{pid_full}_labels.npy", res["labels"])
                 np.save(output_subdir / f"{pid_full}_raw.npy", res["raw_after"].get_data())
                 with open(output_subdir / f"{pid_full}_info.pkl", "wb") as f:
