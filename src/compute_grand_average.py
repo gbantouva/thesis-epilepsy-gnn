@@ -8,8 +8,9 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from preprocess_core import infer_label_from_path
 
 # --- CONFIGURATION ---
-INPUT_EPOCHS_DIR = Path("data_pp")
-OUTPUT_AVERAGE_DIR = Path("figures/grand_average")
+# In src/compute_grand_average.py, change line 11 to:
+INPUT_EPOCHS_DIR = Path(r"C:\Users\georg\Documents\GitHub\thesis-epilepsy-gnn\data_pp")
+OUTPUT_AVERAGE_DIR = Path(r"C:\Users\georg\Documents\GitHub\thesis-epilepsy-gnn\figures\grand_averagez")
 OUTPUT_AVERAGE_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------
 
