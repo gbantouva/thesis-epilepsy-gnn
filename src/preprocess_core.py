@@ -1,87 +1,76 @@
-# src/preprocess_core.py
-
-# EEG Epilepsy Preprocessing Pipeline
-
-#This repository contains a reproducible EEG preprocessing pipeline for epilepsy detection using the Temple University Hospital (TUH) EEG Epilepsy Corpus.
-
-## Overview
-
-#The pipeline processes raw EEG recordings in EDF format by applying:
-
-#- Channel cleaning and standard 10-20 electrode montage assignment  
-#- Average referencing, notch filtering at 60 Hz, and bandpass filtering (0.5–100 Hz)  
-#- Optional ICA artifact removal (disabled by default)  
-#- Resampling to 250 Hz and optional cropping of start segments for controls  
-#- Fixed-length epoching with amplitude-based artifact rejection  
-#- Per-epoch, per-channel z-score normalization  
-#- Label extraction from filename conventions indicating epileptic vs non-epileptic status  
-#- Optional power spectral density (PSD) computation before and after preprocessing  
-
-#Processed epochs, labels, raw data, metadata, and PSD plots are saved for downstream machine learning and graph-based analyses.
-
-## Running the Pipeline
-
-#The core preprocessing logic is in `src/preprocess_core.py`. To preprocess a single EDF file and save outputs (epochs, labels, raw data, PSD plots), run:
-
-#python src/preprocess_single.py --edf path/to/file.edf --out path/to/output_dir --psd_dir path/to/psd_figures
-
 from pathlib import Path
 import re, pickle, numpy as np, mne
 from mne.preprocessing import ICA
 
+# Fixed 10–20 core channel layout (target topology for graphs/ML)
 CORE_CHS = ["Fp1","Fp2","F7","F3","Fz","F4","F8",
             "T1","T3","C3","Cz","C4","T4","T2",
             "T5","P3","Pz","P4","T6","O1","Oz","O2"]
 
 def clean_channel_names(raw: mne.io.BaseRaw):
     """
-    Clean EEG channel names in raw data by removing prefixes and suffixes to standardize channel labels.
-
-    Parameters:
-    -----------
-    raw : mne.io.BaseRaw
-        Raw EEG data object from MNE.
-    
-    Effects:
-    --------
-    Modifies raw in-place by renaming channels.
+    Standardize raw channel names (remove 'EEG ', '-LE', '-REF', trim whitespace).
+    Operates in-place on `raw`.
     """
     mapping = {orig: re.sub(r'^(?:EEG\s*)', '', orig).replace('-LE','').replace('-REF','').strip()
                for orig in raw.ch_names}
     raw.rename_channels(mapping)
 
-def set_montage_with_T1T2(raw: mne.io.BaseRaw):
+def pick_order_and_pad(raw: mne.io.BaseRaw, pad_missing: bool = True):
     """
-    Set standard 10-20 montage for raw EEG data and manually add T1, T2 channel locations 
-    which are not included by default in MNE standard montage.
+    Reorder channels to match CORE_CHS; optionally zero-pad missing ones.
+    Returns:
+      - ordered_list: list of channel names after reordering (CORE_CHS if padded)
+      - present_mask: bool[22] True where original channel existed, False if padded
+    Raises when no CORE_CHS are present and pad_missing=False.
+    """
+    present = [ch for ch in CORE_CHS if ch in raw.ch_names]  # in CORE_CHS order
+    if not present and not pad_missing:
+        raise RuntimeError("No recognizable CORE_CHS channels found in this recording.")
 
-    Parameters:
-    -----------
-    raw : mne.io.BaseRaw
-        Raw EEG data object.
-    
-    Effects:
-    --------
-    Modifies raw in-place by setting its montage.
+    if pad_missing:
+        missing = [ch for ch in CORE_CHS if ch not in raw.ch_names]
+        if missing:
+            data = np.zeros((len(missing), raw.n_times))
+            info = mne.create_info(missing, sfreq=raw.info["sfreq"], ch_types="eeg")
+            raw.add_channels([mne.io.RawArray(data, info)], force_update_info=True)
+        raw.reorder_channels(CORE_CHS)
+        present_mask = np.array([ch in present for ch in CORE_CHS], dtype=bool)
+        return CORE_CHS, present_mask
+
+    # keep only the present subset, ordered
+    raw.pick_channels(present)
+    raw.reorder_channels(present)
+    present_mask = np.array([ch in present for ch in CORE_CHS], dtype=bool)
+    return present, present_mask
+
+def set_montage_for_corechs(raw: mne.io.BaseRaw):
+    """
+    Assign 10–20 electrode positions for channels present in `raw`.
+    Uses standard_1020 where available; approximates T1/T2 (FT9/FT10-like coords).
     """
     std = mne.channels.make_standard_montage('standard_1020')
-    pos = std.get_positions()['ch_pos']
-    pos.update({'T1': [-0.040,-0.090,0.120], 'T2': [0.040,-0.090,0.120]})
-    raw.set_montage(mne.channels.make_dig_montage(ch_pos=pos, coord_frame='head'), match_case=False)
+    pos = std.get_positions()['ch_pos'].copy()
+    ch_pos = {}
+    # Add coordinates for channels that exist in this recording
+    for ch in raw.ch_names:
+        if ch in pos:
+            ch_pos[ch] = pos[ch]
+    # mastoids (approximate)
+    # Add approximate mastoid positions for T1/T2 if present
+    # FT9 : [-0.0840759 0.0145673 -0.050429 ] FT10 : [ 0.0841131 0.0143647 -0.050538 ]
+    if 'T1' in raw.ch_names:
+        ch_pos.setdefault('T1', (-0.0840759, 0.0145673, -0.050429))
+    if 'T2' in raw.ch_names:
+        ch_pos.setdefault('T2', (0.0841131, 0.0143647, -0.050538))
+    #pos.update({'T1': [-0.040,-0.090,0.120], 'T2': [0.040,-0.090,0.120]})
+    montage = mne.channels.make_dig_montage(ch_pos=ch_pos, coord_frame='head')
+    raw.set_montage(montage, match_case=False)
 
 def infer_label_from_path(p: Path) -> int:
     """
-    Infer epilepsy label from file path.
-
-    Parameters:
-    -----------
-    p : Path
-        Path object pointing to an EDF file.
-    
-    Returns:
-    --------
-    int
-        Returns 1 if path matches epilepsy folder pattern, else 0 (non-epilepsy).
+    Infer binary label from path:
+      returns 1 if path contains '/00_epilepsy/', else 0 (control).
     """
     s = str(p).replace('\\','/').lower()
     return 1 if "/00_epilepsy/" in s else 0
@@ -96,72 +85,38 @@ def preprocess_single(
     reject_percentile: float = 95.0,
     crop_first10_if_control: bool = True,
     ica_components=None,
-    return_psd: bool = False
+    return_psd: bool = False,
+    pad_missing: bool = True               # << default: pad with zeros for fixed topology
 ):
     """
-    Preprocess a single raw EDF EEG file for epilepsy detection.
-
-    Steps:
-    - Load raw EDF data (preload)
-    - Clean channel names and select core 22 electrodes
-    - Apply standard 10-20 montage, manually add T1 and T2
-    - Reference signal using common average referencing
-    - Apply notch filter at 60 Hz and bandpass filter (0.5-100 Hz)
-    - Optional ICA artifact removal (disabled by default)
-    - Resample data to fixed frequency (default 250 Hz)
-    - Optionally crop first 10 seconds for control (non-epileptic) recordings
-    - Epoch into fixed-length segments with specified overlap
-    - Artifact rejection based on peak-to-peak amplitude thresholds from percentile
-    - Per-epoch, per-channel z-score normalization
-    - Generate per-epoch labels inferred from file path
-    - Optionally compute power spectral density (PSD) before and after preprocessing
-
-    Parameters:
-    -----------
-    edf_path : Path
-        File path to the raw EEG EDF file.
-    notch : float, optional
-        Notch filter frequency in Hz, default 60.0 (powerline noise).
-    band : tuple of float, optional
-        Bandpass filter low and high cutoff frequencies (Hz), default (0.5, 100.0).
-    resample_hz : float, optional
-        Sampling frequency to resample the data to, default 250 Hz.
-    epoch_len : float, optional
-        Epoch length in seconds, default 2.0.
-    epoch_overlap : float, optional
-        Overlap duration between epochs in seconds, default 0.0.
-    reject_percentile : float, optional
-        Percentile for peak-to-peak amplitude thresholding during artifact rejection, default 95.
-    crop_first10_if_control : bool, optional
-        Whether to crop first 10 seconds for non-epilepsy files, default True.
-    ica_components : list or None, optional
-        List of ICA components to exclude (disabled by default).
-    return_psd : bool, optional
-        Whether to compute and return PSD estimates before and after preprocessing, default False.
-
-    Returns:
-    --------
-    dict:
-        Dictionary containing:
-        - 'raw_after' : MNE Raw object post preprocessing,
-        - 'epochs' : MNE Epochs object of cleaned and normalized segments,
-        - 'labels' : numpy array of epoch labels,
-        - 'threshold_uv' : peak-to-peak microvolt threshold used,
-        - 'present_channels' : list of channels retained,
-        - 'psd_before' (optional) : PSD object before preprocessing,
-        - 'psd_after' (optional) : PSD object after preprocessing.
+    End-to-end preprocessing for a single EDF:
+      - Load EDF, keep EEG, clean names
+      - Enforce CORE_CHS order; optionally pad missing channels
+      - Set montage (incl. T1/T2 approximations)
+      - Common average reference, notch, band-pass
+      - Optional ICA (fitting scaffold present)
+      - Resample; optionally crop first 10s for controls
+      - Epoch, percentile-based amplitude rejection
+      - Per-epoch, per-channel z-scoring across time
+      - Create per-epoch labels from path
+      - (Optional) PSD before/after
+    Returns dict with processed Raw, Epochs, labels, thresholds, channel info, and masks.
     """
-
+    edf_path = Path(edf_path)
     # Load raw data
     raw_before = mne.io.read_raw_edf(str(edf_path), preload=True, verbose="ERROR")
     raw_before.pick_types(eeg=True)
     clean_channel_names(raw_before)
     raw = raw_before.copy()
 
-    # Pick core channels and set montage
-    present = [ch for ch in CORE_CHS if ch in raw.ch_names]
-    raw.pick_channels(present); raw_before.pick_channels(present)
-    set_montage_with_T1T2(raw)
+    # --- Enforce your channel order; pad missing if requested ---
+    if pad_missing and not any(ch in raw_before.ch_names for ch in CORE_CHS):
+        raise RuntimeError("No CORE_CHS present in this recording; aborting to avoid all-zero data.")
+    present, present_mask = pick_order_and_pad(raw, pad_missing=pad_missing)
+    pick_order_and_pad(raw_before, pad_missing=pad_missing)  # mirror for PSD-before alignment
+
+    # --- Montage consistent with CORE_CHS names ---
+    set_montage_for_corechs(raw)
 
     # Common average reference and filtering
     raw.set_eeg_reference('average', projection=False)
@@ -193,15 +148,20 @@ def preprocess_single(
     #m, s = Xc.mean(), Xc.std() if Xc.std() != 0 else 1.0
     #epochs_clean._data = (Xc - m) / s
 
-    # Per-epoch, per-channel z-score normalization
-    Xc = epochs_clean.get_data()                     # shape: (n_epochs, n_channels, n_times)
-    m = Xc.mean(axis=2, keepdims=True)              # mean over time (per epoch/ch)
-    s = Xc.std(axis=2, keepdims=True)               # std over time (per epoch/ch)
-    s[s == 0] = 1.0                                 # avoid division by zero
-    epochs_clean._data = (Xc - m) / s
+    # --- Per-epoch, per-channel z-score across time ---
+    Xc = epochs_clean.get_data()
+    m = Xc.mean(axis=2, keepdims=True)
+    s = Xc.std(axis=2, keepdims=True)
+    s[s == 0] = 1.0
+    Xz = (Xc - m) / s
+    epochs_clean = mne.EpochsArray(
+        Xz, epochs_clean.info, events=epochs_clean.events,
+        tmin=epochs_clean.tmin, event_id=epochs_clean.event_id, on_missing='ignore'
+    )
 
-    # Labels per epoch
+    # --- Labels per epoch (subject-level from path) ---
     y = np.full(len(epochs_clean), label, dtype=int)
+
 
     # Collect results
     out = {
@@ -209,7 +169,9 @@ def preprocess_single(
         "epochs": epochs_clean,
         "labels": y,
         "threshold_uv": thr_uv,
-        "present_channels": present
+        "present_channels": present,
+        "present_mask": present_mask,  # True for originally present CORE_CHS
+
     }
     if return_psd:
         out["psd_before"] = raw_before.compute_psd(fmax=band[1], average='mean')
