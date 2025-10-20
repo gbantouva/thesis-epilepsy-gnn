@@ -135,6 +135,8 @@ if __name__ == "__main__":
     parser.add_argument("--pad-missing", dest="pad_missing", action="store_true",
                         help="Enable zero-padding of missing channels (fixed topology).")
     parser.set_defaults(pad_missing=False)
+
+    args = parser.parse_args()
     
     import numpy as np
     import pickle
