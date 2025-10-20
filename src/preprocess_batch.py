@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import argparse
 import traceback
+import json
 from tqdm import tqdm
 
 sys.path.append(str(Path(__file__).resolve().parent))
@@ -9,7 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 from preprocess_core import preprocess_single
 
 
-def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None):
+def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None, pad_missing: bool = False):
     """
     Batch preprocess EEG EDF files from a root directory recursively.
 
@@ -70,7 +71,6 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                 continue # Skip the rest of the loop for this file
 
 
-
             if patient_id not in processed_patients:
                 if max_patients is not None and len(processed_patients) >= max_patients:
                     print(f"Reached max patient limit: {max_patients}. Stopping.")
@@ -79,7 +79,12 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
             
             try:
                 print(f"Processing {edf_file} (patient {patient_id})...")
-                res = preprocess_single(edf_file, return_psd=True)
+                res = preprocess_single(edf_file, return_psd=True, pad_missing=pad_missing)
+
+                X = res["epochs"].get_data()  # (E, C, T)
+                if not np.isfinite(X).all():
+                    raise ValueError(f"{edf_file}: non-finite values in epochs")
+
                 
                 # Preserve folder hierarchy in output and psd dirs
                 #relative_path = edf_file.parent.relative_to(input_path)
@@ -93,12 +98,16 @@ def main(input_dir: str, output_dir: str, psd_dir: str, max_patients: int = None
                 #np.save(output_subdir / f"{pid_full}_epochs.npy", res["epochs"].get_data())
                 #np.save(output_subdir / f"{pid_full}_labels.npy", res["labels"])
                 #np.save(output_subdir / f"{pid_full}_raw.npy", res["raw_after"].get_data())
-                np.save(expected_output_file, res["epochs"].get_data()) # Using expected_output_file here
+                #np.save(expected_output_file, res["epochs"].get_data()) # Using expected_output_file here
+                np.save(expected_output_file, X)
                 np.save(output_subdir / f"{pid_full}_labels.npy", res["labels"])
                 np.save(output_subdir / f"{pid_full}_raw.npy", res["raw_after"].get_data())
+                np.save(output_subdir / f"{pid_full}_present_mask.npy", res["present_mask"])
                 with open(output_subdir / f"{pid_full}_info.pkl", "wb") as f:
                     pickle.dump(res["raw_after"].info, f)
-                
+                with open(output_subdir / f"{pid_full}_present_channels.json", "w", encoding="utf-8") as f:
+                    json.dump(res["present_channels"], f, ensure_ascii=False, indent=2)
+
                 for tag, psd in [("before", res.get("psd_before")), ("after", res.get("psd_after"))]:
                     if psd is None:
                         continue
@@ -122,10 +131,13 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", required=True, help="Folder to save preprocessed arrays and metadata")
     parser.add_argument("--psd_dir", required=True, help="Folder to save PSD plots")
     parser.add_argument("--max_patients", type=int, default=None, help="Limit unique patients processed")
-    args = parser.parse_args()
+    # Simple positive flag; default False
+    parser.add_argument("--pad-missing", dest="pad_missing", action="store_true",
+                        help="Enable zero-padding of missing channels (fixed topology).")
+    parser.set_defaults(pad_missing=False)
     
     import numpy as np
     import pickle
     import matplotlib.pyplot as plt
     
-    main(args.input_dir, args.output_dir, args.psd_dir, max_patients=args.max_patients)
+    main(args.input_dir, args.output_dir, args.psd_dir, max_patients=args.max_patients, pad_missing=args.pad_missing)
