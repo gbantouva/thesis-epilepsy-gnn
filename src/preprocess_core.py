@@ -1,7 +1,7 @@
 from pathlib import Path
 import re, pickle, numpy as np, mne
 from mne.preprocessing import ICA
-
+#python src\preprocess_batch.py --input_dir data_raw\DATA --output_dir data_pp --psd_dir figures\psd --max_patients 10 --pad-missing 
 # Fixed 10–20 core channel layout (target topology for graphs/ML)
 CORE_CHS = ["Fp1","Fp2","F7","F3","Fz","F4","F8",
             "T1","T3","C3","Cz","C4","T4","T2",
@@ -174,6 +174,20 @@ def preprocess_single(
 
     }
     if return_psd:
-        out["psd_before"] = raw_before.compute_psd(fmax=band[1], average='mean')
-        out["psd_after"]  = raw.compute_psd(fmax=band[1],  average='mean')
+        # channels that actually existed in the EDF
+        real_chs = [ch for ch, m in zip(CORE_CHS, present_mask) if m]
+
+        # BEFORE: compute PSD on real channels only (avoid padded zeros)
+        rb = raw_before.copy()
+        if real_chs:                      # only pick if we have any real channels
+            rb.pick_channels(real_chs)
+        out["psd_before"] = rb.compute_psd(fmax=band[1], average='mean')
+
+        # AFTER: (recommended) also drop padded channels for a clean plot
+        ra = raw.copy()
+        if real_chs:
+            ra.pick_channels(real_chs)
+        out["psd_after"] = ra.compute_psd(fmax=band[1], average='mean')
+        #out["psd_before"] = raw_before.compute_psd(fmax=band[1], average='mean')
+        #out["psd_after"]  = raw.compute_psd(fmax=band[1],  average='mean')
     return out
