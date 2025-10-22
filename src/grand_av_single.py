@@ -1,13 +1,6 @@
-# python -c "import sys; sys.path.append(r'C:/Users/georg/Documents/GitHub/thesis-epilepsy-gnn/src'); \
-#from grand_av_single import single_patient_grand_average as run; \
-#ga,chs,fs,psd,f = run(
-#    r'C:/Users/georg/Documents/GitHub/thesis-epilepsy-gnn/data_pp/00_epilepsy/aaaaaanr/s001_2003/02_tcp_le/aaaaaanr_s001_t001_epochs.npy', 
-#    r'C:/Users/georg/Documents/GitHub/thesis-epilepsy-gnn/data_pp/00_epilepsy/aaaaaanr/s001_2003/02_tcp_le/aaaaaanr_s001_t001_info.pkl',
-#    out_png_time=r'C:/Users/georg/Documents/GitHub/thesis-epilepsy-gnn/figures/grand_av/PID_time.png',
-#    out_png_psd=r'C:/Users/georg/Documents/GitHub/thesis-epilepsy-gnn/figures/grand_av/PID_psd.png'
-#); print(ga.shape, fs, psd.shape, f.shape)"
-
+#python -c "import sys; sys.path.append(r'F:/October-Thesis/thesis-epilepsy-gnn/src'); from grand_av_single import single_patient_grand_average as run; ga,chs,fs,psd,f = run(r'F:/October-Thesis/thesis-epilepsy-gnn/data_pp/00_epilepsy/aaaaaanr/s001_2003/02_tcp_le/aaaaaanr_s001_t001_epochs.npy', r'F:/October-Thesis/thesis-epilepsy-gnn/data_pp/00_epilepsy/aaaaaanr/s001_2003/02_tcp_le/aaaaaanr_s001_t001_info.pkl', out_png_time=r'F:/October-Thesis/thesis-epilepsy-gnn/figures/grand_av/PID_time.png', out_png_psd=r'F:/October-Thesis/thesis-epilepsy-gnn/figures/grand_av/PID_psd.png'); print(ga.shape, fs, psd.shape, f.shape)"
 from pathlib import Path
+import mne
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -85,11 +78,12 @@ def plot_time_grand_average(ga, chs, fs, out_png=None):
         If provided, path to save the plot.
     """
     sel = [c for c in ["Fz","Cz","Pz","O1","O2"] if c in chs]
-    # sel = chs  # use all available channels #for all channels
+    #sel = chs  # use all available channels #for all channels
     idx = [chs.index(c) for c in sel]
     t = np.arange(ga.shape[1]) / fs
 
-    plt.figure(figsize=(10,5)) # plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(10,5)) 
+    #plt.figure(figsize=(12, 6))
     for i, c in zip(idx, sel):
         plt.plot(t, ga[i], label=c, alpha=0.9)
     plt.xlabel("Time (s)")
@@ -101,6 +95,60 @@ def plot_time_grand_average(ga, chs, fs, out_png=None):
         Path(out_png).parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(out_png, dpi=150)
     plt.close()
+
+def plot_topomap_band(mean_psd, freqs, chs, band, out_png=None, sfreq=250.0):
+    """
+    Plot topographic scalp map for a specific frequency band (e.g., alpha).
+    Handles T1/T2 by assigning FT9/FT10-like coordinates.
+    """
+    import mne
+    import numpy as np
+    from pathlib import Path
+    import matplotlib.pyplot as plt
+
+    fmin, fmax = band
+    idx_band = np.where((freqs >= fmin) & (freqs <= fmax))[0]
+    band_power = mean_psd[:, idx_band].mean(axis=1)  # (C,)
+
+    # Start from standard_1020 positions
+    std = mne.channels.make_standard_montage("standard_1020")
+    pos = std.get_positions()["ch_pos"].copy()
+
+    # Approximate mastoids for T1/T2 if present in chs
+    # (same numbers you used in preprocessing)
+    if "T1" in chs and "T1" not in pos:
+        pos["T1"] = np.array([-0.0840759, 0.0145673, -0.050429])  # ~FT9
+    if "T2" in chs and "T2" not in pos:
+        pos["T2"] = np.array([ 0.0841131, 0.0143647, -0.050538])  # ~FT10
+
+    # Keep only channels that we have coordinates for
+    chs_with_pos = [c for c in chs if c in pos]
+    if not chs_with_pos:
+        raise RuntimeError("No channels have positions for topomap.")
+
+    # Map band_power to this subset
+    idx_keep = [chs.index(c) for c in chs_with_pos]
+    data_keep = band_power[idx_keep]
+
+    # Build a DigMontage for the available channels
+    dig = mne.channels.make_dig_montage(
+        ch_pos={c: pos[c] for c in chs_with_pos}, coord_frame="head"
+    )
+    info = mne.create_info(chs_with_pos, sfreq=sfreq, ch_types="eeg")
+    info.set_montage(dig, match_case=False)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(5, 4))
+    im, _ = mne.viz.plot_topomap(
+        data_keep, info, axes=ax, show=False, names=chs_with_pos,
+        contours=0, cmap="RdBu_r", sphere=0.09
+    )
+    ax.set_title(f"{fmin}-{fmax} Hz band power")
+    plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.05, pad=0.07)
+    if out_png:
+        Path(out_png).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(out_png, dpi=150, bbox_inches="tight")
+    plt.close(fig)
 
 def plot_psd_grand_average(mean_psd, f, chs, out_png=None):
     """
@@ -118,9 +166,11 @@ def plot_psd_grand_average(mean_psd, f, chs, out_png=None):
         If provided, path to save the plot.
     """
     sel = [c for c in ["Fz","Cz","Pz","O1","O2"] if c in chs]
+    #sel = chs  # use all available channels #for all channels
     idx = [chs.index(c) for c in sel]
 
     plt.figure(figsize=(10,5))
+    #plt.figure(figsize=(12, 6))
     for i, c in zip(idx, sel):
         plt.semilogy(f, mean_psd[i], label=c) # semilogy for clearer view
     plt.xlabel("Frequency (Hz)")
@@ -171,6 +221,11 @@ def single_patient_grand_average(epochs_npy, info_pkl, out_png_time=None, out_pn
     # Frequency-domain mean (PSD)
     mean_psd, f = compute_psd_grand_average(X, fs)
     plot_psd_grand_average(mean_psd, f, chs, out_png_psd)
+    plot_topomap_band(
+    mean_psd, f, chs, band=(8, 12),
+    out_png=r"F:/October-Thesis/thesis-epilepsy-gnn/figures/grand_av/PID_alpha_topomap.png",
+    sfreq=fs
+)
 
     return ga, chs, fs, mean_psd, f
 
