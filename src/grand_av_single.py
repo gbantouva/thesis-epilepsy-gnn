@@ -85,10 +85,11 @@ def plot_time_grand_average(ga, chs, fs, out_png=None):
         If provided, path to save the plot.
     """
     sel = [c for c in ["Fz","Cz","Pz","O1","O2"] if c in chs]
+    # sel = chs  # use all available channels #for all channels
     idx = [chs.index(c) for c in sel]
     t = np.arange(ga.shape[1]) / fs
 
-    plt.figure(figsize=(10,5))
+    plt.figure(figsize=(10,5)) # plt.figure(figsize=(12, 6))
     for i, c in zip(idx, sel):
         plt.plot(t, ga[i], label=c, alpha=0.9)
     plt.xlabel("Time (s)")
