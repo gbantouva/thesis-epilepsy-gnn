@@ -18,7 +18,7 @@ import json
 
 from preprocess_core import preprocess_single
 
-def main(edf:str, out:str, psd_dir:str, pad_missing: bool):
+def main(edf:str, out:str, psd_dir:str, pad_missing: bool, ica: bool, ica_dir:str):
     """
     Preprocess a single raw EEG EDF file and save preprocessed outputs.
 
@@ -36,7 +36,7 @@ def main(edf:str, out:str, psd_dir:str, pad_missing: bool):
     
     # Run preprocessing pipeline on single EDF file
     #res = preprocess_single(edf, return_psd=True, pad_missing=args.pad_missing)  # use defaults from core
-    res = preprocess_single(edf, return_psd=True, pad_missing=pad_missing)  # use defaults from core
+    res = preprocess_single(edf, return_psd=True, pad_missing=pad_missing, ica_components=ica, ica_dir=ica_dir)  # use defaults from core
     pid = edf.stem
 
     # Save preprocessed numpy arrays and metadata
@@ -62,6 +62,11 @@ if __name__ == "__main__":
     parser.add_argument("--out", required=True, help="Output directory for arrays and metadata")
     parser.add_argument("--psd_dir", required=True, help="Output directory for PSD figures")
     parser.add_argument("--pad_missing", action="store_true", help="Zero-pad missing CORE_CHS")
+    # --- ADD THIS LINE ---
+    parser.add_argument("--ica", action="store_true", help="Run automated ICA artifact removal")
+    # --- END OF ADDED LINE ---
+    # --- ADD THIS LINE ---
+    parser.add_argument("--ica_dir", help="Output directory for ICA component figures")
     args = parser.parse_args()
     #main(args.edf, args.out, args.psd_dir)
-    main(args.edf, args.out, args.psd_dir, args.pad_missing)
+    main(args.edf, args.out, args.psd_dir, args.pad_missing, args.ica, args.ica_dir)
