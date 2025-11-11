@@ -1,151 +1,165 @@
-import sys
-from pathlib import Path
+"""
+Calculate grand average PSD for ONE patient (all their epoch files combined).
+
+Usage:
+  python src\grand_av_patient.py --patient_id aaaaaanr --data_dir F:\October-Thesis\thesis-epilepsy-gnn\test\data_pp --output_dir F:\October-Thesis\thesis-epilepsy-gnn\test\figures\grand_average\single_patient
+"""
+
+import mne
 import numpy as np
+import pickle
+from pathlib import Path
+import matplotlib.pyplot as plt
 import argparse
 
-# --- Add 'src' to path if needed ---
-# This helps Python find your 'grand_av_single' script,
-# assuming 'grand_av_single.py' is in a folder named 'src'.
-# Adjust if your structure is different.
-src_path = Path(__file__).resolve().parent.parent / "src"
-if src_path.exists() and str(src_path) not in sys.path:
-    sys.path.append(str(src_path))
 
-# --- Import functions from your previous script ---
-try:
-    # We assume your previous script is saved as 'grand_av_single.py'
-    from grand_av_single import (
-        load_info,
-        compute_psd_grand_average,
-        plot_time_grand_average,
-        plot_psd_grand_average,
-        plot_topomap_band
-    )
-except ImportError:
-    print(f"Error: Could not import from 'grand_av_single.py'.")
-    print(f"Make sure it is in your Python path (e.g., in {src_path})")
-    sys.exit(1)
-
-
-def calculate_patient_grand_average(
-    patient_id: str,
-    data_pp_dir: Path,
-    figures_dir: Path
-):
+def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, output_dir: Path):
     """
-    Finds all epoch files for a single patient, computes their true
-    grand average in time and frequency, and saves the plots.
+    Find all epoch files for ONE patient, concatenate them, and compute PSD grand average.
+    
+    Args:
+        patient_id: Patient identifier (e.g., "aaaaaanr")
+        data_dir: Root preprocessed data directory
+        output_dir: Where to save results
     """
-    print(f"--- Calculating Grand Average for Patient: {patient_id} ---")
-
-    # 1. Find all epoch files for this patient
-    # We search recursively (**) for any file starting with the patient ID
-    # and ending in _epochs.npy
-    search_pattern = f"**/{patient_id}*_epochs.npy"
-    epoch_files = list(data_pp_dir.rglob(search_pattern))
-
+    print(f"\n{'='*70}")
+    print(f"GRAND AVERAGE PSD COMPUTATION: Patient {patient_id}")
+    print(f"{'='*70}\n")
+    
+    # ========== STEP 1: Find all epoch files for this patient ==========
+    print("Step 1: Finding epoch files...")
+    epoch_files = list(data_dir.rglob(f"**/{patient_id}/**/*_epochs.npy"))
+    
     if not epoch_files:
-        print(f"Error: No '*_epochs.npy' files found for patient ID '{patient_id}' "
-              f"in {data_pp_dir}")
+        print(f"❌ Error: No epoch files found for patient {patient_id}")
         return
-
-    print(f"Found {len(epoch_files)} epoch files.")
-
-    # 2. Load and concatenate all epoch arrays
-    all_epochs_list = []
+    
+    print(f"✓ Found {len(epoch_files)} epoch files:")
     for f in epoch_files:
+        print(f"  - {f.name}")
+    
+    # ========== STEP 2: Load and concatenate all epochs ==========
+    print("\nStep 2: Loading and concatenating epochs...")
+    all_epochs = []
+    info = None
+    
+    for i, epoch_file in enumerate(epoch_files):
         try:
-            data = np.load(f)
-            # Check if (E, C, T) and not empty
-            if data.ndim == 3 and data.shape[0] > 0: 
-                all_epochs_list.append(data)
-            else:
-                print(f"Warning: Skipping {f} (empty or wrong dimensions: {data.shape})")
+            # Load epochs
+            data = np.load(epoch_file)
+            all_epochs.append(data)
+            print(f"  ✓ Loaded {epoch_file.name}: {data.shape[0]} epochs")
+            
+            # Load info (only need once)
+            if i == 0:
+                pid = epoch_file.stem.replace("_epochs", "")
+                info_file = epoch_file.parent / f"{pid}_info.pkl"
+                with open(info_file, 'rb') as f:
+                    info = pickle.load(f)
+                    
         except Exception as e:
-            print(f"Warning: Could not load {f}. Error: {e}")
-
-    if not all_epochs_list:
-        print("Error: No valid epoch data loaded. Aborting.")
-        return
-
-    # Combine into one large array: (Total_Patient_Epochs, 22, 500)
-    all_patient_epochs = np.concatenate(all_epochs_list, axis=0)
-    print(f"Total epochs for patient: {all_patient_epochs.shape[0]}")
-
-    # 3. Load info (chs, fs) from the *first* file
-    # We assume all files for a patient have the same info (fs, chs)
-    first_file = epoch_files[0]
-    info_file_name = first_file.stem.replace("_epochs", "_info") + ".pkl"
-    info_file = first_file.with_name(info_file_name)
+            print(f"  ✗ Error loading {epoch_file.name}: {e}")
     
-    if not info_file.exists():
-        print(f"Error: Corresponding info file not found: {info_file}")
+    if not all_epochs:
+        print("❌ No valid data loaded")
         return
     
-    chs, fs = load_info(info_file)
-    print(f"Loaded info: {len(chs)} channels, {fs} Hz")
-
-    # 4. Ensure output directory exists
-    figures_dir.mkdir(parents=True, exist_ok=True)
-
-    # 5. Calculate Time-domain grand average and plot
-    print("Calculating time-domain average...")
-    # This is the key step: averaging the giant concatenated array
-    ga_patient_time = np.mean(all_patient_epochs, axis=0) # Shape (C, T)
+    # Concatenate: (n_epochs_total, n_channels, n_times)
+    all_data = np.concatenate(all_epochs, axis=0)
+    print(f"\n✓ Concatenated: {all_data.shape[0]} total epochs")
+    print(f"  Shape: {all_data.shape} (epochs × channels × times)")
     
-    time_plot_path = figures_dir / f"{patient_id}_GA_time.png"
-    plot_time_grand_average(ga_patient_time, chs, fs, out_png=time_plot_path)
-    print(f"Saved time-domain plot to {time_plot_path}")
-
-    # 6. Calculate Frequency-domain (PSD) grand average and plot
-    print("Calculating frequency-domain average...")
-    # We also pass the giant array to the PSD function
-    mean_psd, f = compute_psd_grand_average(all_patient_epochs, fs) # Shape (C, F)
-
-    psd_plot_path = figures_dir / f"{patient_id}_GA_psd.png"
-    plot_psd_grand_average(mean_psd, f, chs, out_png=psd_plot_path)
-    print(f"Saved PSD plot to {psd_plot_path}")
-
-    # 7. Plot topomap (e.g., Alpha band)
-    print("Calculating topomap...")
-    topo_plot_path = figures_dir / f"{patient_id}_GA_alpha_topomap.png"
-    plot_topomap_band(
-        mean_psd, f, chs, band=(8, 12), # e.g., Alpha band
-        out_png=topo_plot_path,
-        sfreq=fs
-    )
-    print(f"Saved alpha topomap to {topo_plot_path}")
-    print(f"--- Finished Patient: {patient_id} ---")
+    # ========== STEP 3: Create MNE Epochs object ==========
+    print("\nStep 3: Creating MNE Epochs object...")
+    patient_epochs = mne.EpochsArray(all_data, info, verbose=False)
+    print(f"✓ Created Epochs object")
+    
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # ========== STEP 4: FREQUENCY-DOMAIN GRAND AVERAGE (PSD) ==========
+    print("\nStep 4: Computing FREQUENCY-DOMAIN grand average (PSD)...")
+    print("ℹ️  NOTE: Time-domain averaging is skipped because data is z-scored (unitless).")
+    
+    # Compute PSD
+    patient_psd = patient_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+    patient_avg_psd = patient_psd.average()
+    
+    # Get data
+    psd_data = patient_avg_psd.get_data()  # (n_channels, n_freqs)
+    freqs = patient_avg_psd.freqs
+    print(f"✓ PSD grand average shape: {psd_data.shape}")
+    
+    # Save as .npy
+    np.save(output_dir / f"{patient_id}_psd_grand_avg.npy", psd_data)
+    np.save(output_dir / f"{patient_id}_psd_freqs.npy", freqs)
+    print(f"✓ Saved: {patient_id}_psd_grand_avg.npy")
+    print(f"✓ Saved: {patient_id}_psd_freqs.npy")
+    
+    # Prepare plotting
+    ch_names = info['ch_names']
+    plot_channels = ["Fp1", "Fz", "Cz", "Pz", "O1", "O2"]
+    available = [ch for ch in plot_channels if ch in ch_names]
+    
+    # Plot with frequency bands
+    fig, ax = plt.subplots(figsize=(12, 6))
+    for ch in available:
+        idx = ch_names.index(ch)
+        ax.semilogy(freqs, psd_data[idx], label=ch, alpha=0.8, linewidth=1.5)
+    
+    # Mark frequency bands
+    bands = {
+        'Delta': (0.5, 4),
+        'Theta': (4, 8),
+        'Alpha': (8, 13),
+        'Beta': (13, 30),
+        'Gamma': (30, 100)
+    }
+    
+    y_min, y_max = ax.get_ylim()
+    for band_name, (f_low, f_high) in bands.items():
+        ax.axvspan(f_low, f_high, alpha=0.1)
+        ax.text((f_low + f_high)/2, y_max * 0.7, band_name,
+               ha='center', fontsize=10, fontweight='bold')
+    
+    ax.set_xlabel("Frequency (Hz)", fontsize=12)
+    ax.set_ylabel("Power Spectral Density", fontsize=12)
+    ax.set_title(f"Patient {patient_id} - PSD Grand Average", 
+                fontsize=14, fontweight='bold')
+    ax.set_xlim([0, 100])
+    ax.legend(loc='upper right')
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    fig.savefig(output_dir / f"{patient_id}_psd_grand_avg.png", dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f"✓ Saved: {patient_id}_psd_grand_avg.png")
+    
+    # ========== SUMMARY ==========
+    print(f"\n{'='*70}")
+    print("SUMMARY")
+    print(f"{'='*70}")
+    print(f"Patient ID:         {patient_id}")
+    print(f"Files processed:    {len(epoch_files)}")
+    print(f"Total epochs:       {all_data.shape[0]}")
+    print(f"Channels:           {all_data.shape[1]}")
+    print(f"Timepoints/epoch:   {all_data.shape[2]}")
+    print(f"Sampling rate:      {info['sfreq']} Hz")
+    print(f"Output directory:   {output_dir}")
+    print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Calculate true grand average for a single patient "
-                    "by combining all their .npy files."
+        description="Calculate grand average PSD for a single patient"
     )
-    parser.add_argument(
-        "--id", 
-        required=True, 
-        help="Patient ID (e.g., 'aaaaaanr')"
-    )
-    parser.add_argument(
-        "--data_dir", 
-        required=True, 
-        help="Path to the *root* preprocessed data directory (e.g., 'data_pp')"
-    )
-    parser.add_argument(
-        "--fig_dir", 
-        required=True, 
-        help="Path to save the output figures (e.g., 'figures/grand_av_patient')"
-    )
+    parser.add_argument("--patient_id", required=True, help="Patient ID (e.g., 'aaaaaanr')")
+    parser.add_argument("--data_dir", required=True, help="Root data directory (e.g., 'data_pp')")
+    parser.add_argument("--output_dir", required=True, help="Output directory")
     
     args = parser.parse_args()
-
-    calculate_patient_grand_average(
-        patient_id=args.id,
-        data_pp_dir=Path(args.data_dir),
-        figures_dir=Path(args.fig_dir)
+    
+    calculate_single_patient_grand_average(
+        patient_id=args.patient_id,
+        data_dir=Path(args.data_dir),
+        output_dir=Path(args.output_dir)
     )
-
-    # --- Example Command to Run ---
-    # python grand_av_patient.py --id aaaaaanr --data_dir data_pp --fig_dir figures/grand_av_patients
