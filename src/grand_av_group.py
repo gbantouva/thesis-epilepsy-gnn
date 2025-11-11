@@ -1,432 +1,748 @@
-# src/grand_av_group.py
 """
-Group grand averages (Epilepsy vs Control) from preprocessed outputs.
+Batch Grand Average PSD Analysis: All Patients (Epilepsy vs Control)
 
-- Walks data_pp recursively, finds * _epochs.npy and the companion files:
-    *_present_mask.npy, *_info.pkl, (optional) *_present_channels.json
-- Per subject:
-    • time-domain mean across epochs -> (C, T)   [NaN for padded chans]
-    • PSD per epoch/channel (Welch) -> mean -> (C, F)  [NaN for padded chans]
-- Groups by label inferred from path: "/00_epilepsy/" -> 1, else 0
-- Saves group grand-averages + figures:
-    • group_time_{control,epilepsy}.npy      shape (22, T)
-    • group_psd_{control,epilepsy}.npy       shape (22, F)
-    • group_psd_freqs.npy                    shape (F,)
-    • group_psd_{control,epilepsy}.png       PSD curves (selected chans)
-    • topomap_{band}_{control,epilepsy}.png  band-power scalp maps
+This script:
+1. Discovers all patients from directory structure
+2. Computes PSD grand average for each patient
+3. Groups patients by Epilepsy vs Control
+4. Creates group-level averages
+5. Performs statistical comparisons
+6. Generates publication-quality figures
+7. Extracts band power features for GNN
+
+Usage:
+  python grand_average_batch_psd.py --data_dir data_pp --output_dir figures/grand_average_analysis
+
+Example:
+  python grand_average_batch_psd.py \
+    --data_dir F:\\October-Thesis\\thesis-epilepsy-gnn\\test\\data_pp \
+    --output_dir F:\\October-Thesis\\thesis-epilepsy-gnn\\figures\\grand_average_analysis \
+    --max_patients 50
 """
 
-from pathlib import Path
-import numpy as np
-import pickle, json
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from scipy.signal import welch
 import mne
+import numpy as np
+import pickle
+import pandas as pd
+from pathlib import Path
+import matplotlib.pyplot as plt
 import argparse
-import time
+from collections import defaultdict
+from tqdm import tqdm
+from scipy import stats
+import seaborn as sns
 
-CORE_CHS = ["Fp1","Fp2","F7","F3","Fz","F4","F8",
-            "T1","T3","C3","Cz","C4","T4","T2",
-            "T5","P3","Pz","P4","T6","O1","Oz","O2"]
+# Set plot style
+sns.set_style("whitegrid")
+plt.rcParams['figure.dpi'] = 150
 
-FS_TARGET = 250.0  # resample_hz used in preprocessing; change if you used a different value
 
-def plot_group_time_curves(GA_t, chs, fs, name, out_png, sel=("Fz","Cz","Pz","O1","O2")):
+def discover_patients(data_dir: Path):
     """
-    GA_t: (C, T) group grand-average in time domain (NaN for padded chans)
-    chs: list of channel names in CORE_CHS order
-    fs:  sampling rate (Hz)
-    name: group name for title
-    out_png: path to save figure
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from pathlib import Path
-
-    t = np.arange(GA_t.shape[1]) / fs
-    present = [c for c in sel if c in chs]
-    idx = [chs.index(c) for c in present]
-
-    fig = plt.figure(figsize=(10, 5))
-    for i, c in zip(idx, present):
-        y = GA_t[i]
-        if np.isfinite(y).any():
-            plt.plot(t, y, label=c, alpha=0.9)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Amplitude (z-score)")
-    plt.title(f"Group grand-average (time domain) — {name}")
-    plt.legend()
-    plt.tight_layout()
-    Path(out_png).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_png, dpi=150)
-    plt.close(fig)
-
-
-def infer_label_from_path(p: Path) -> int:
-    s = str(p).replace("\\","/").lower()
-    return 1 if "/00_epilepsy/" in s else 0  # 1=epilepsy, 0=control
-
-def load_subject(prefix: Path):
-    """
-    prefix: path without the suffix, e.g. /.../aaaaaanr_s001_t001   (no _epochs.npy)
-    returns: X (E,C,T), mask (C,), chs (list[str]), fs (float)
-    """
-    X = np.load(prefix.parent / f"{prefix.name}_epochs.npy")  # (E,C,T)
-    mask_path = prefix.parent / f"{prefix.name}_present_mask.npy"
-    mask = np.load(mask_path).astype(bool) if mask_path.exists() else np.ones(X.shape[1], bool)
-
-    info_pkl = prefix.parent / f"{prefix.name}_info.pkl"
-    with open(info_pkl, "rb") as f:
-        info = pickle.load(f)
-    chs = list(info["ch_names"])
-    fs = float(info["sfreq"])
-    return X, mask, chs, fs
-
-def subject_time_mean(X, mask):
-    X = X.astype(np.float64, copy=False)
-    X[:, ~mask, :] = np.nan
-    return np.nanmean(X, axis=0)  # (C,T)
-
-def subject_psd_mean(X, mask, fs, nperseg=512, noverlap=256):
-    E, C, T = X.shape
-    freqs = None
-    psd = np.full((C, 0), np.nan)
-    rows = []
-    for c in range(C):
-        if not mask[c]:
-            rows.append(None)
-            continue
-        pxx_list = []
-        for e in range(E):
-            f, Pxx = welch(X[e, c, :], fs=fs, nperseg=min(nperseg, T), noverlap=min(noverlap, T//2))
-            pxx_list.append(Pxx)
-        pxx_arr = np.vstack(pxx_list)  # (E,F)
-        if freqs is None:
-            freqs = f
-        rows.append(pxx_arr.mean(axis=0))
-    C_out, F = C, len(freqs)
-    psd = np.full((C_out, F), np.nan)
-    for c, row in enumerate(rows):
-        if row is not None:
-            psd[c] = row
-    return psd, freqs
-
-def topomap_band(power_c, chs, band_name, out_png, vlim="auto"):
-    """
-    power_c: array (C,) band power per channel (can include NaN -> ignored)
-    chs: channel names in CORE_CHS order
-    Adds approximate positions for T1/T2 (FT9/FT10-like).
-    """
-    std = mne.channels.make_standard_montage("standard_1020")
-    pos = std.get_positions()["ch_pos"].copy()
-    # Add T1/T2 approx
-    if "T1" in chs and "T1" not in pos:
-        pos["T1"] = np.array([-0.0840759, 0.0145673, -0.050429])
-    if "T2" in chs and "T2" not in pos:
-        pos["T2"] = np.array([ 0.0841131, 0.0143647, -0.050538])
-
-    chs_with_pos = [c for c in chs if c in pos]
-    idx = [chs.index(c) for c in chs_with_pos]
-    data_keep = power_c[idx]
-
-    ## --- ADDED FIX --- ##
-    # Filter out NaNs for plotting
-    finite_mask = np.isfinite(data_keep)
-    if not finite_mask.any():
-        print(f"[WARN] No finite data for topomap {band_name}. Skipping plot.")
-        return
-        
-    data_keep = data_keep[finite_mask]
-    # Filter channel names and positions to match the non-NaN data
-    chs_with_pos = [chs_with_pos[i] for i, mask_val in enumerate(finite_mask) if mask_val]
-    ## --- END FIX --- ##
-
-    dig = mne.channels.make_dig_montage(
-        ch_pos={c: pos[c] for c in chs_with_pos}, coord_frame="head"
-    )
-    info = mne.create_info(chs_with_pos, sfreq=250.0, ch_types="eeg")
-    info.set_montage(dig, match_case=False)
-
-    fig, ax = plt.subplots(figsize=(4.8, 5.2))
-    im, _ = mne.viz.plot_topomap(
-        data_keep, info, axes=ax, show=False, names=chs_with_pos,
-        contours=0, cmap="RdBu_r", sphere=0.09
-    )
-    ax.set_title(f"{band_name} band power")
-    if vlim != "auto":
-        im.set_clim(*vlim)
-    cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.05, pad=0.07)
-    cbar.ax.set_xlabel("Power")
-    Path(out_png).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_png, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-
-def main(data_pp_dir: str, out_dir: str, max_patients: int = None,
-         plot_channels=("Fz","Cz","Pz","O1","O2"),
-         bands=(("theta",(4,7)), ("alpha",(8,12)), ("beta",(13,30)))):
+    Discover all unique patients from directory structure.
     
-    start_total_time = time.time() ## ADDED ##
+    Returns:
+        Dictionary mapping patient_id -> {
+            "label": 0 or 1,
+            "files": [list of epoch file paths]
+        }
+    """
+    patients = defaultdict(lambda: {"label": None, "files": []})
     
-    root = Path(data_pp_dir)
-    out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)
-
-    # Find all subject prefixes
-    epochs = sorted(root.rglob("*_epochs.npy"))
-    prefixes = [Path(str(p).rsplit("_epochs.npy",1)[0]) for p in epochs]
-
-    if not prefixes: ## ADDED: Check if files were found ##
-        print(f"Error: No '*_epochs.npy' files found in {root.resolve()}.")
-        print("Please check your --data_pp_dir path.")
-        return ## ADDED: Exit early ##
+    print("Discovering patients from directory structure...")
+    all_epoch_files = list(data_dir.rglob("*_epochs.npy"))
+    print(f"Found {len(all_epoch_files)} total epoch files")
     
-    groups = {0: [], 1: []}  # 0=control, 1=epilepsy
-    freqs_ref = None
-    chs_ref = CORE_CHS  # postproc should align to CORE_CHS
-
-    ## ADDED: Dictionaries to track patient times and file counts ##
-    patient_times = {} 
-    patient_file_counts = {}
-    total_files_processed = 0
-
-    processed_patients = set() ## ADDED: Set to track unique patients ##
-    # Per-subject aggregation
-    # count = 0
-    for pref in prefixes:
+    for epoch_file in all_epoch_files:
         try:
-            start_time = time.time() ## This is your "per-file" timer ##
+            # Get the full path as string for easier checking
+            full_path_str = str(epoch_file).replace('\\', '/')
             
-            ## ADDED: Get patient_id from filename ##
-            patient_id = pref.name.split('_')[0] 
-
-            ## --- MODIFIED: Patient Limit Logic --- ##
-            if max_patients is not None:
-                if patient_id not in processed_patients:
-                    # This is a new patient
-                    if len(processed_patients) >= max_patients:
-                        # We've already hit our patient limit, skip this file
-                        print(f"Skipping file: {pref.name} (Patient {patient_id}). Patient limit {max_patients} reached.")
-                        continue # Skip this file
-                    else:
-                        # Add this new patient to our set
-                        print(f"Adding new patient: {patient_id} ({len(processed_patients) + 1}/{max_patients})")
-                        processed_patients.add(patient_id)
-            ## --- END MODIFIED LOGIC --- ##
-            
-            print(f"Processing file: {pref.name} (Patient: {patient_id})")
-            
-
-            X, mask, chs, fs = load_subject(pref)
-            if len(chs) != len(CORE_CHS):
-                # Safety: reorder if needed
-                order = [chs.index(c) for c in CORE_CHS if c in chs]
-                X = X[:, order, :]
-                mask = mask[order]
-                chs = [chs[i] for i in order]
-            subj_time = subject_time_mean(X, mask)      # (C,T)
-            subj_psd, freqs = subject_psd_mean(X, mask, fs)    # (C,F)
-
-            if freqs_ref is None:
-                freqs_ref = freqs
-            elif len(freqs) != len(freqs_ref) or not np.allclose(freqs, freqs_ref):
-                print(f"[WARN] {pref.name}: PSD freqs differ -> skipping subject.")
+            # Determine label from path
+            # Check for the actual directory names in your dataset
+            if '/00_epilepsy/' in full_path_str or '\\00_epilepsy\\' in str(epoch_file):
+                label = 1  # Epilepsy
+            elif '/01_no_epilepsy/' in full_path_str or '\\01_no_epilepsy\\' in str(epoch_file):
+                label = 0  # Control (no epilepsy)
+            elif '/01_control/' in full_path_str or '\\01_control\\' in str(epoch_file):
+                label = 0  # Control (alternative name)
+            else:
+                print(f"  ⚠️ Cannot determine label for: {epoch_file}")
                 continue
-
-            label = infer_label_from_path(pref)
-            groups[label].append((subj_time, subj_psd))
-
-            elapsed = time.time() - start_time
             
-            ## ADDED: Accumulate time and file count for this patient ##
-            patient_times[patient_id] = patient_times.get(patient_id, 0) + elapsed
-            patient_file_counts[patient_id] = patient_file_counts.get(patient_id, 0) + 1
-
-            print(f"Finished {pref.name} in {elapsed:.1f} seconds")
-            
-            total_files_processed += 1 ## ADDED ##
-            #count += 1
-            #if max_subjects and count >= max_subjects:
-            #    break
-        except Exception as e:
-            print(f"[ERR] {pref}: {e}")
-
-    if not groups[0] and not groups[1]:
-        raise RuntimeError("No subjects aggregated. Check data_pp_dir.")
-
-    ## ADDED: Print patient-level time statistics ##
-    print("\n--- Processing Time Summary ---")
-    if patient_times:
-        num_patients = len(patient_times)
-        avg_patient_time = sum(patient_times.values()) / num_patients
-        print(f"Total unique patients processed: {num_patients}")
-        print(f"Average time per patient: {avg_patient_time:.2f}s")
-        # Optional: Print time for each patient (can be long)
-        # for pid, t in patient_times.items():
-        #     print(f"  - Patient {pid}: {t:.2f}s ({patient_file_counts[pid]} files)")
-    else:
-        print("No patients processed.")
-    print(f"Total files processed: {total_files_processed}")
-    print("---------------------------------\n")
-
-
-    # Helper: group mean with NaN-safe averaging
-    def nanmean_stack(items, axis=0, out_shape=None):
-    #"""NaN-safe mean over a list. If empty, return NaNs of out_shape."""
-        if len(items) == 0:
-            if out_shape is None:
-                raise ValueError("nanmean_stack called with empty items and no out_shape.")
-            return np.full(out_shape, np.nan)
-        arr = np.stack(items, axis=0)
-        return np.nanmean(arr, axis=axis)
-
-    # --- compute & save per-group grand averages ---
-    saved = {}
-    for label, name in [(0,"control"), (1,"epilepsy")]:
-        n_subj = len(groups[label])
-        print(f"[INFO] {name}: {n_subj} subjects aggregated")
-        if n_subj == 0:
-            # make placeholder NaN arrays so later code can still run
-            GA_t = np.full((len(CORE_CHS), 1), np.nan)
-            GA_p = np.full((len(CORE_CHS), len(freqs_ref) if freqs_ref is not None else 1), np.nan)
-            saved[name] = dict(time=GA_t, psd=GA_p)
-            continue
-
-        times = [t for (t, p) in groups[label]]
-        psds  = [p for (t, p) in groups[label]]
-        # Provide shapes so empty lists won’t warn (we guarded above anyway)
-        GA_t = nanmean_stack(times, axis=0, out_shape=times[0].shape)    # (C,T)
-        GA_p = nanmean_stack(psds,  axis=0, out_shape=psds[0].shape)    # (C,F)
-
-        np.save(out / f"group_time_{name}.npy", GA_t)
-        np.save(out / f"group_psd_{name}.npy",  GA_p)
-        # Save time-domain figure
-        plot_group_time_curves(
-            GA_t, CORE_CHS, FS_TARGET, name,
-            out / f"group_time_{name}.png"
-        )
-
-        if freqs_ref is not None:
-            np.save(out / f"group_psd_freqs.npy",   freqs_ref)
-        saved[name] = dict(time=GA_t, psd=GA_p)
-
-        # PSD curves (selected channels)
-        ch_to_idx = {c:i for i,c in enumerate(CORE_CHS)}
-        fig = plt.figure(figsize=(10,5))
-        for ch in plot_channels:
-            if ch in ch_to_idx:
-                P = GA_p[ch_to_idx[ch]]
-                if np.isfinite(P).any():
-                    plt.semilogy(freqs_ref, P, label=ch)
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Power Spectral Density")
-        plt.title(f"Group grand-average PSD ({name})")
-        plt.xlim(0, 100)
-        plt.legend()
-        plt.tight_layout()
-        fig.savefig(out / f"group_psd_{name}.png", dpi=150)
-        plt.close(fig)
-
-        # Topomaps per band
-        for bname, (fmin,fmax) in bands:
-            if freqs_ref is None:
-                continue
-            idx = np.where((freqs_ref >= fmin) & (freqs_ref <= fmax))[0]
-            if idx.size == 0:
-                print(f"[WARN] {name}: band {bname} ({fmin}-{fmax}) not in frequency grid; skipping topomap.")
-                continue
-            band_power = np.nanmean(GA_p[:, idx], axis=1)  # (C,)
-            topomap_band(band_power, CORE_CHS, f"{bname} ({fmin}-{fmax} Hz)",
-                         out / f"topomap_{bname}_{name}.png")
-
-    print(f"Saved group outputs in: {out}")
-
-    # --- NEW: DIFF (Epilepsy - Control) ---
-    if "epilepsy" in saved and "control" in saved:
-        diff_psd = saved["epilepsy"]["psd"] - saved["control"]["psd"]   # (C,F)
-        np.save(out / "group_psd_diff_epilepsy_minus_control.npy", diff_psd)
-
-        # PSD difference curves on selected channels (linear y, can also do semilogy)
-        ch_to_idx = {c:i for i,c in enumerate(CORE_CHS)}
-        fig = plt.figure(figsize=(10,5))
-        for ch in plot_channels:
-            if ch in ch_to_idx:
-                D = diff_psd[ch_to_idx[ch]]
-                if np.isfinite(D).any():
-                    plt.plot(freqs_ref, D, label=ch)  # signed difference
-        plt.axhline(0, color="k", lw=1, ls="--")
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("PSD difference (Epilepsy - Control)")
-        plt.title("Group PSD difference (Epilepsy - Control)")
-        plt.xlim(0, 100)
-        plt.legend()
-        plt.tight_layout()
-        fig.savefig(out / "group_psd_diff_curves.png", dpi=150)
-        plt.close(fig)
-
-        # Topomap differences per band with symmetric color limits around 0
-        for bname, (fmin,fmax) in bands:
-            idx = np.where((freqs_ref >= fmin) & (freqs_ref <= fmax))[0]
-            diff_band = np.nanmean(diff_psd[:, idx], axis=1)  # (C,)
-
-            # symmetric vlim for comparable color scaling
-            vmax = np.nanmax(np.abs(diff_band))
-            vlim = (-vmax, vmax) if np.isfinite(vmax) and vmax > 0 else "auto"
-
-            # reuse topomap helper; pass vlim via wrapper
-            def topomap_band_with_vlim(power_c, chs, band_name, out_png, vlim):
-                std = mne.channels.make_standard_montage("standard_1020")
-                pos = std.get_positions()["ch_pos"].copy()
-                if "T1" in chs and "T1" not in pos:
-                    pos["T1"] = np.array([-0.0840759, 0.0145673, -0.050429])
-                if "T2" in chs and "T2" not in pos:
-                    pos["T2"] = np.array([ 0.0841131, 0.0145673, -0.050538])
-                chs_with_pos = [c for c in chs if c in pos]
-                idx_keep = [chs.index(c) for c in chs_with_pos]
-                data_keep = power_c[idx_keep]
-                ## --- ADDED FIX --- ##
-                finite_mask = np.isfinite(data_keep)
-                if not finite_mask.any():
-                    print(f"[WARN] No finite data for topomap {band_name}. Skipping plot.")
-                    return
-                data_keep = data_keep[finite_mask]
-                chs_with_pos = [chs_with_pos[i] for i, mask_val in enumerate(finite_mask) if mask_val]
-                ## --- END FIX --- ##
+            # Extract patient ID from path
+            try:
+                rel_path = epoch_file.relative_to(data_dir)
+                parts = rel_path.parts
                 
-                dig = mne.channels.make_dig_montage(
-                    ch_pos={c: pos[c] for c in chs_with_pos}, coord_frame="head"
-                )
-                info = mne.create_info(chs_with_pos, sfreq=250.0, ch_types="eeg")
-                info.set_montage(dig, match_case=False)
-                fig, ax = plt.subplots(figsize=(4.8, 5.2))
-                im, _ = mne.viz.plot_topomap(
-                    data_keep, info, axes=ax, show=False, names=chs_with_pos,
-                    contours=0, cmap="RdBu_r", sphere=0.09
-                )
-                ax.set_title(f"{band_name} (Epi - Ctrl)")
-                if vlim != "auto":
-                    im.set_clim(*vlim)
-                cbar = plt.colorbar(im, ax=ax, orientation="horizontal", fraction=0.05, pad=0.07)
-                cbar.ax.set_xlabel("Δ Power")
-                fig.savefig(out_png, dpi=150, bbox_inches="tight")
-                plt.close(fig)
-
-            topomap_band_with_vlim(diff_band, CORE_CHS, f"{bname} ({fmin}-{fmax} Hz)", 
-                                 out / f"topomap_{bname}_diff_epi_minus_ctrl.png", vlim=vlim)
-
-    print(f"Saved group outputs in: {out}")
+                # Structure: data_pp/00_epilepsy/PATIENT_ID/session/recording/file
+                # or:        data_pp/01_no_epilepsy/PATIENT_ID/session/recording/file
+                if len(parts) >= 2 and parts[0] in ["00_epilepsy", "01_no_epilepsy", "01_control"]:
+                    patient_id = parts[1]  # e.g., "aaaaaanr"
+                else:
+                    # Fallback: extract from filename
+                    filename = epoch_file.stem.replace("_epochs", "")
+                    patient_id = filename.split('_')[0]
+            except ValueError:
+                # File not under data_dir
+                filename = epoch_file.stem.replace("_epochs", "")
+                patient_id = filename.split('_')[0]
+            
+            # Add to patient's file list
+            patients[patient_id]["files"].append(epoch_file)
+            
+            # Set or verify label consistency
+            if patients[patient_id]["label"] is None:
+                patients[patient_id]["label"] = label
+            elif patients[patient_id]["label"] != label:
+                print(f"  ⚠️ WARNING: Patient {patient_id} has inconsistent labels!")
+                print(f"     Previous: {patients[patient_id]['label']}, Current: {label}")
+                print(f"     File: {epoch_file}")
+                
+        except Exception as e:
+            print(f"  ⚠️ Could not process {epoch_file}: {e}")
+            continue
     
-    ## ADDED: Print total script runtime ##
-    end_total_time = time.time()
-    total_elapsed = end_total_time - start_total_time
-    print(f"\n--- Total Script Runtime ---")
-    print(f"Finished processing all {total_files_processed} files in {total_elapsed:.2f} seconds.")
-    print("------------------------------")
+    # Debug: print first few patients from each group to verify
+    print(f"\nDiscovered {len(patients)} unique patients")
+    
+    epilepsy_list = [(pid, data) for pid, data in patients.items() if data["label"] == 1]
+    control_list = [(pid, data) for pid, data in patients.items() if data["label"] == 0]
+    
+    print(f"\nFirst 3 EPILEPSY patients:")
+    for pid, data in epilepsy_list[:3]:
+        print(f"  {pid}: {len(data['files'])} files")
+    
+    print(f"\nFirst 3 CONTROL patients:")
+    for pid, data in control_list[:3]:
+        print(f"  {pid}: {len(data['files'])} files")
+    
+    return dict(patients)
+
+
+def compute_patient_psd(patient_id: str, epoch_files: list, label: int):
+    """
+    Compute PSD grand average for a single patient.
+    
+    Args:
+        patient_id: Patient identifier
+        epoch_files: List of epoch file paths
+        label: 0 (control) or 1 (epilepsy)
+        
+    Returns:
+        Dictionary with psd_data, freqs, info, n_epochs, or None if failed
+    """
+    try:
+        # Load and concatenate all epochs
+        all_epochs = []
+        info = None
+        
+        for i, epoch_file in enumerate(epoch_files):
+            data = np.load(epoch_file)
+            all_epochs.append(data)
+            
+            if i == 0:
+                pid = epoch_file.stem.replace("_epochs", "")
+                info_file = epoch_file.parent / f"{pid}_info.pkl"
+                with open(info_file, 'rb') as f:
+                    info = pickle.load(f)
+        
+        if not all_epochs or info is None:
+            return None
+        
+        # Concatenate all epochs
+        all_data = np.concatenate(all_epochs, axis=0)
+        
+        # Create MNE Epochs object
+        patient_epochs = mne.EpochsArray(all_data, info, verbose=False)
+        
+        # Compute PSD
+        patient_psd = patient_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+        patient_avg_psd = patient_psd.average()
+        
+        # Get data
+        psd_data = patient_avg_psd.get_data()  # (n_channels, n_freqs)
+        freqs = patient_avg_psd.freqs
+        
+        return {
+            "psd_data": psd_data,
+            "freqs": freqs,
+            "info": info,
+            "n_epochs": all_data.shape[0],
+            "label": label,
+            "patient_id": patient_id
+        }
+        
+    except Exception as e:
+        print(f"  ✗ Error processing {patient_id}: {e}")
+        return None
+
+
+def extract_band_powers(psd_data, freqs):
+    """
+    Extract band powers from PSD.
+    
+    Args:
+        psd_data: (n_channels, n_freqs) PSD array
+        freqs: Frequency array
+        
+    Returns:
+        Dictionary with band powers per channel
+    """
+    bands = {
+        'delta': (0.5, 4),
+        'theta': (4, 8),
+        'alpha': (8, 13),
+        'beta': (13, 30),
+        'gamma': (30, 100)
+    }
+    
+    band_powers = {}
+    
+    for band_name, (f_low, f_high) in bands.items():
+        # Find frequency indices
+        idx = np.where((freqs >= f_low) & (freqs <= f_high))[0]
+        
+        # Integrate power in band (mean across frequencies)
+        band_power = np.mean(psd_data[:, idx], axis=1)  # (n_channels,)
+        band_powers[band_name] = band_power
+    
+    return band_powers
+
+
+def plot_group_comparison_psd(epilepsy_results, control_results, output_dir):
+    """
+    Create publication-quality PSD comparison figure (Epilepsy vs Control).
+    
+    Similar to Figure 1 in the reference paper.
+    """
+    print("\nGenerating group comparison plots...")
+    
+    # Extract data
+    epilepsy_psds = np.array([r["psd_data"] for r in epilepsy_results])  # (n_patients, n_channels, n_freqs)
+    control_psds = np.array([r["psd_data"] for r in control_results])
+    freqs = epilepsy_results[0]["freqs"]
+    ch_names = epilepsy_results[0]["info"]["ch_names"]
+    
+    # Compute group means and SEM
+    epilepsy_mean = np.mean(epilepsy_psds, axis=0)  # (n_channels, n_freqs)
+    epilepsy_sem = np.std(epilepsy_psds, axis=0) / np.sqrt(len(epilepsy_psds))
+    
+    control_mean = np.mean(control_psds, axis=0)
+    control_sem = np.std(control_psds, axis=0) / np.sqrt(len(control_psds))
+    
+    # Select representative channels for plotting
+    plot_channels = ["Fp1", "Fz", "Cz", "Pz", "O1", "O2"]
+    available = [ch for ch in plot_channels if ch in ch_names]
+    
+    # Create figure with two subplots
+    fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    
+    # ========== PANEL A: Epilepsy Group ==========
+    ax = axes[0]
+    for ch in available:
+        idx = ch_names.index(ch)
+        
+        # Plot mean
+        ax.semilogy(freqs, epilepsy_mean[idx], label=ch, alpha=0.8, linewidth=2)
+        
+        # Plot SEM as shaded area
+        ax.fill_between(
+            freqs,
+            epilepsy_mean[idx] - epilepsy_sem[idx],
+            epilepsy_mean[idx] + epilepsy_sem[idx],
+            alpha=0.2
+        )
+    
+    ax.set_ylabel("Power Spectral Density", fontsize=12, fontweight='bold')
+    ax.set_title(f"EPILEPSY GROUP (n={len(epilepsy_results)} patients)", 
+                fontsize=14, fontweight='bold', color='red')
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim([0, 100])
+    
+    # Mark frequency bands
+    bands = {
+        'Delta': (0.5, 4),
+        'Theta': (4, 8),
+        'Alpha': (8, 13),
+        'Beta': (13, 30),
+        'Gamma': (30, 100)
+    }
+    
+    y_min, y_max = ax.get_ylim()
+    for band_name, (f_low, f_high) in bands.items():
+        ax.axvspan(f_low, f_high, alpha=0.05, color='gray')
+        ax.text((f_low + f_high)/2, y_max * 0.8, band_name,
+               ha='center', fontsize=9, fontweight='bold', color='gray')
+    
+    # ========== PANEL B: Control Group ==========
+    ax = axes[1]
+    for ch in available:
+        idx = ch_names.index(ch)
+        
+        # Plot mean
+        ax.semilogy(freqs, control_mean[idx], label=ch, alpha=0.8, linewidth=2)
+        
+        # Plot SEM as shaded area
+        ax.fill_between(
+            freqs,
+            control_mean[idx] - control_sem[idx],
+            control_mean[idx] + control_sem[idx],
+            alpha=0.2
+        )
+    
+    ax.set_xlabel("Frequency (Hz)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Power Spectral Density", fontsize=12, fontweight='bold')
+    ax.set_title(f"CONTROL GROUP (n={len(control_results)} patients)",
+                fontsize=14, fontweight='bold', color='blue')
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    ax.set_xlim([0, 100])
+    
+    # Mark frequency bands
+    for band_name, (f_low, f_high) in bands.items():
+        ax.axvspan(f_low, f_high, alpha=0.05, color='gray')
+    
+    plt.suptitle("Grand Average PSD: Group Comparison", 
+                fontsize=16, fontweight='bold', y=0.995)
+    plt.tight_layout()
+    
+    # Save figure
+    fig.savefig(output_dir / "group_comparison_psd.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"  ✓ Saved: group_comparison_psd.png")
+    
+    # Save group data
+    np.save(output_dir / "epilepsy_psd_mean.npy", epilepsy_mean)
+    np.save(output_dir / "epilepsy_psd_sem.npy", epilepsy_sem)
+    np.save(output_dir / "control_psd_mean.npy", control_mean)
+    np.save(output_dir / "control_psd_sem.npy", control_sem)
+    np.save(output_dir / "psd_freqs.npy", freqs)
+    print(f"  ✓ Saved: group PSD data arrays")
+
+
+def plot_psd_difference(epilepsy_results, control_results, output_dir):
+    """
+    Plot the difference in PSD (Epilepsy - Control) with statistical significance.
+    """
+    print("\nGenerating PSD difference plot...")
+    
+    # Extract data
+    epilepsy_psds = np.array([r["psd_data"] for r in epilepsy_results])
+    control_psds = np.array([r["psd_data"] for r in control_results])
+    freqs = epilepsy_results[0]["freqs"]
+    ch_names = epilepsy_results[0]["info"]["ch_names"]
+    
+    # Compute means
+    epilepsy_mean = np.mean(epilepsy_psds, axis=0)
+    control_mean = np.mean(control_psds, axis=0)
+    
+    # Compute difference
+    diff_mean = epilepsy_mean - control_mean  # (n_channels, n_freqs)
+    
+    # Statistical test at each frequency
+    p_values = np.zeros((len(ch_names), len(freqs)))
+    for ch_idx in range(len(ch_names)):
+        for f_idx in range(len(freqs)):
+            epi_vals = epilepsy_psds[:, ch_idx, f_idx]
+            ctrl_vals = control_psds[:, ch_idx, f_idx]
+            _, p_values[ch_idx, f_idx] = stats.ttest_ind(epi_vals, ctrl_vals)
+    
+    # Select representative channels
+    plot_channels = ["Fp1", "Fz", "Cz", "Pz", "O1", "O2"]
+    available = [ch for ch in plot_channels if ch in ch_names]
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(14, 6))
+    
+    for ch in available:
+        idx = ch_names.index(ch)
+        
+        # Plot difference
+        ax.plot(freqs, diff_mean[idx], label=ch, alpha=0.8, linewidth=2)
+        
+        # Mark significant frequencies (p < 0.05)
+        sig_mask = p_values[idx] < 0.05
+        sig_freqs = freqs[sig_mask]
+        sig_vals = diff_mean[idx][sig_mask]
+        ax.scatter(sig_freqs, sig_vals, s=10, alpha=0.5)
+    
+    # Mark frequency bands
+    bands = {
+        'Delta': (0.5, 4),
+        'Theta': (4, 8),
+        'Alpha': (8, 13),
+        'Beta': (13, 30),
+        'Gamma': (30, 100)
+    }
+    
+    y_min, y_max = ax.get_ylim()
+    for band_name, (f_low, f_high) in bands.items():
+        ax.axvspan(f_low, f_high, alpha=0.05, color='gray')
+        ax.text((f_low + f_high)/2, y_max * 0.9, band_name,
+               ha='center', fontsize=10, fontweight='bold', color='gray')
+    
+    ax.axhline(0, color='k', linestyle='--', linewidth=1)
+    ax.set_xlabel("Frequency (Hz)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("PSD Difference (Epilepsy - Control)", fontsize=12, fontweight='bold')
+    ax.set_title("PSD Difference with Statistical Significance (p < 0.05)", 
+                fontsize=14, fontweight='bold')
+    ax.set_xlim([0, 100])
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    fig.savefig(output_dir / "psd_difference.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"  ✓ Saved: psd_difference.png")
+    
+    # Save difference data
+    np.save(output_dir / "psd_difference.npy", diff_mean)
+    np.save(output_dir / "psd_pvalues.npy", p_values)
+
+
+def plot_band_power_comparison(epilepsy_results, control_results, output_dir):
+    """
+    Create bar plots comparing band powers between groups.
+    """
+    print("\nGenerating band power comparison...")
+    
+    # Extract band powers for all patients
+    bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
+    
+    epilepsy_band_powers = {band: [] for band in bands}
+    control_band_powers = {band: [] for band in bands}
+    
+    for result in epilepsy_results:
+        band_powers = extract_band_powers(result["psd_data"], result["freqs"])
+        for band in bands:
+            # Average across channels for this patient
+            epilepsy_band_powers[band].append(np.mean(band_powers[band]))
+    
+    for result in control_results:
+        band_powers = extract_band_powers(result["psd_data"], result["freqs"])
+        for band in bands:
+            control_band_powers[band].append(np.mean(band_powers[band]))
+    
+    # Create bar plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    
+    x = np.arange(len(bands))
+    width = 0.35
+    
+    epilepsy_means = [np.mean(epilepsy_band_powers[b]) for b in bands]
+    epilepsy_sems = [np.std(epilepsy_band_powers[b]) / np.sqrt(len(epilepsy_band_powers[b])) for b in bands]
+    
+    control_means = [np.mean(control_band_powers[b]) for b in bands]
+    control_sems = [np.std(control_band_powers[b]) / np.sqrt(len(control_band_powers[b])) for b in bands]
+    
+    bars1 = ax.bar(x - width/2, epilepsy_means, width, label='Epilepsy', 
+                   color='red', alpha=0.7, yerr=epilepsy_sems, capsize=5)
+    bars2 = ax.bar(x + width/2, control_means, width, label='Control',
+                   color='blue', alpha=0.7, yerr=control_sems, capsize=5)
+    
+    # Add statistical significance markers
+    for i, band in enumerate(bands):
+        t_stat, p_val = stats.ttest_ind(epilepsy_band_powers[band], control_band_powers[band])
+        if p_val < 0.001:
+            marker = '***'
+        elif p_val < 0.01:
+            marker = '**'
+        elif p_val < 0.05:
+            marker = '*'
+        else:
+            marker = 'ns'
+        
+        y_pos = max(epilepsy_means[i], control_means[i]) + max(epilepsy_sems[i], control_sems[i])
+        ax.text(i, y_pos * 1.1, marker, ha='center', fontsize=12, fontweight='bold')
+    
+    ax.set_xlabel("Frequency Band", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Mean Power (averaged across channels)", fontsize=12, fontweight='bold')
+    ax.set_title("Band Power Comparison: Epilepsy vs Control\n(* p<0.05, ** p<0.01, *** p<0.001)",
+                fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels([b.capitalize() for b in bands])
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    plt.tight_layout()
+    fig.savefig(output_dir / "band_power_comparison.png", dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print(f"  ✓ Saved: band_power_comparison.png")
+
+
+def save_band_powers_csv(all_results, output_dir):
+    """
+    Save band powers for all patients as CSV (for GNN features).
+    """
+    print("\nExtracting band power features for GNN...")
+    
+    bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
+    ch_names = all_results[0]["info"]["ch_names"]
+    
+    # Create dataframe
+    rows = []
+    
+    for result in all_results:
+        patient_id = result["patient_id"]
+        label = result["label"]
+        
+        band_powers = extract_band_powers(result["psd_data"], result["freqs"])
+        
+        row = {
+            'patient_id': patient_id,
+            'label': label,
+            'label_name': 'epilepsy' if label == 1 else 'control',
+            'n_epochs': result["n_epochs"]
+        }
+        
+        # Add band powers per channel
+        for band in bands:
+            for ch_idx, ch_name in enumerate(ch_names):
+                row[f'{band}_{ch_name}'] = band_powers[band][ch_idx]
+        
+        rows.append(row)
+    
+    df = pd.DataFrame(rows)
+    
+    # Save full dataset
+    csv_path = output_dir / "band_powers_all_patients.csv"
+    df.to_csv(csv_path, index=False)
+    print(f"  ✓ Saved: band_powers_all_patients.csv")
+    print(f"    Shape: {df.shape} (patients × features)")
+    print(f"    Columns: patient_id, label, label_name, n_epochs, + {len(bands) * len(ch_names)} band power features")
+    
+    # Also save separate files for each group
+    df[df['label'] == 1].to_csv(output_dir / "band_powers_epilepsy.csv", index=False)
+    df[df['label'] == 0].to_csv(output_dir / "band_powers_control.csv", index=False)
+    print(f"  ✓ Saved: band_powers_epilepsy.csv and band_powers_control.csv")
+    
+    return df
+
+
+def create_summary_report(epilepsy_results, control_results, output_dir):
+    """
+    Create a text summary report.
+    """
+    print("\nGenerating summary report...")
+    
+    report_path = output_dir / "analysis_summary.txt"
+    
+    with open(report_path, 'w') as f:
+        f.write("="*70 + "\n")
+        f.write("GRAND AVERAGE PSD ANALYSIS - SUMMARY REPORT\n")
+        f.write("="*70 + "\n\n")
+        
+        f.write("SAMPLE SIZES:\n")
+        f.write(f"  Epilepsy patients: {len(epilepsy_results)}\n")
+        f.write(f"  Control patients: {len(control_results)}\n")
+        f.write(f"  Total patients: {len(epilepsy_results) + len(control_results)}\n\n")
+        
+        f.write("AVERAGE EPOCHS PER PATIENT:\n")
+        epi_epochs = [r["n_epochs"] for r in epilepsy_results]
+        ctrl_epochs = [r["n_epochs"] for r in control_results]
+        f.write(f"  Epilepsy: {np.mean(epi_epochs):.1f} ± {np.std(epi_epochs):.1f}\n")
+        f.write(f"  Control: {np.mean(ctrl_epochs):.1f} ± {np.std(ctrl_epochs):.1f}\n\n")
+        
+        f.write("BAND POWER COMPARISONS (averaged across channels):\n")
+        bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
+        
+        for band in bands:
+            epi_powers = []
+            ctrl_powers = []
+            
+            for result in epilepsy_results:
+                bp = extract_band_powers(result["psd_data"], result["freqs"])
+                epi_powers.append(np.mean(bp[band]))
+            
+            for result in control_results:
+                bp = extract_band_powers(result["psd_data"], result["freqs"])
+                ctrl_powers.append(np.mean(bp[band]))
+            
+            t_stat, p_val = stats.ttest_ind(epi_powers, ctrl_powers)
+            cohen_d = (np.mean(epi_powers) - np.mean(ctrl_powers)) / np.sqrt(
+                (np.std(epi_powers)**2 + np.std(ctrl_powers)**2) / 2
+            )
+            
+            f.write(f"\n  {band.upper()}:\n")
+            f.write(f"    Epilepsy: {np.mean(epi_powers):.4f} ± {np.std(epi_powers):.4f}\n")
+            f.write(f"    Control:  {np.mean(ctrl_powers):.4f} ± {np.std(ctrl_powers):.4f}\n")
+            f.write(f"    t-statistic: {t_stat:.3f}\n")
+            f.write(f"    p-value: {p_val:.6f}\n")
+            f.write(f"    Cohen's d: {cohen_d:.3f}\n")
+            
+            if p_val < 0.001:
+                f.write(f"    Significance: *** (p < 0.001)\n")
+            elif p_val < 0.01:
+                f.write(f"    Significance: ** (p < 0.01)\n")
+            elif p_val < 0.05:
+                f.write(f"    Significance: * (p < 0.05)\n")
+            else:
+                f.write(f"    Significance: ns (not significant)\n")
+        
+        f.write("\n" + "="*70 + "\n")
+        f.write("OUTPUT FILES:\n")
+        f.write("  - group_comparison_psd.png: Main comparison figure\n")
+        f.write("  - psd_difference.png: Difference plot with significance\n")
+        f.write("  - band_power_comparison.png: Bar plot by frequency band\n")
+        f.write("  - band_powers_all_patients.csv: Features for GNN\n")
+        f.write("  - individual_patients/: PSD data for each patient\n")
+        f.write("="*70 + "\n")
+    
+    print(f"  ✓ Saved: analysis_summary.txt")
+
+
+def main():
+    import time
+    
+    parser = argparse.ArgumentParser(
+        description="Batch grand average PSD analysis with group comparisons",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    parser.add_argument(
+        "--data_dir",
+        required=True,
+        help="Root preprocessed data directory"
+    )
+    parser.add_argument(
+        "--output_dir",
+        required=True,
+        help="Output directory for analysis results"
+    )
+    parser.add_argument(
+        "--max_patients",
+        type=int,
+        default=None,
+        help="Maximum number of patients to process (default: all)"
+    )
+    parser.add_argument(
+        "--save_individual",
+        action="store_true",
+        help="Save individual patient PSDs"
+    )
+    
+    args = parser.parse_args()
+    
+    data_dir = Path(args.data_dir)
+    output_dir = Path(args.output_dir)
+    
+    if not data_dir.exists():
+        print(f"Error: Data directory not found: {data_dir}")
+        return
+    
+    # Create output directories
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if args.save_individual:
+        (output_dir / "individual_patients").mkdir(exist_ok=True)
+    
+    # Start timing
+    start_time = time.time()
+    
+    print("\n" + "="*70)
+    print("BATCH GRAND AVERAGE PSD ANALYSIS")
+    print("="*70)
+    
+    # Discover patients
+    patients = discover_patients(data_dir)
+    
+    if not patients:
+        print("Error: No patients found!")
+        return
+    
+    # Limit if requested
+    if args.max_patients:
+        patients = dict(list(patients.items())[:args.max_patients])
+        print(f"Limited to {len(patients)} patients")
+    
+    # Separate by group
+    epilepsy_patients = {pid: data for pid, data in patients.items() if data["label"] == 1}
+    control_patients = {pid: data for pid, data in patients.items() if data["label"] == 0}
+    
+    print(f"\nPatients discovered:")
+    print(f"  - Epilepsy: {len(epilepsy_patients)}")
+    print(f"  - Control: {len(control_patients)}")
+    print(f"  - Total: {len(patients)}")
+    
+    # Process all patients
+    print("\n" + "="*70)
+    print("PROCESSING PATIENTS")
+    print("="*70)
+    
+    all_results = []
+    epilepsy_results = []
+    control_results = []
+    
+    for patient_id, patient_data in tqdm(patients.items(), desc="Computing PSDs"):
+        result = compute_patient_psd(
+            patient_id=patient_id,
+            epoch_files=patient_data["files"],
+            label=patient_data["label"]
+        )
+        
+        if result is not None:
+            all_results.append(result)
+            
+            if result["label"] == 1:
+                epilepsy_results.append(result)
+            else:
+                control_results.append(result)
+            
+            # Save individual patient data if requested
+            if args.save_individual:
+                ind_dir = output_dir / "individual_patients"
+                np.save(ind_dir / f"{patient_id}_psd.npy", result["psd_data"])
+                np.save(ind_dir / f"{patient_id}_freqs.npy", result["freqs"])
+    
+    print(f"\n✓ Successfully processed: {len(all_results)}/{len(patients)} patients")
+    print(f"  - Epilepsy: {len(epilepsy_results)}")
+    print(f"  - Control: {len(control_results)}")
+    
+    if len(epilepsy_results) == 0 or len(control_results) == 0:
+        print("\n⚠️ WARNING: Need both epilepsy and control patients for comparison!")
+        return
+    
+    # Generate analysis outputs
+    print("\n" + "="*70)
+    print("GENERATING ANALYSIS OUTPUTS")
+    print("="*70)
+    
+    # Main comparison figure
+    plot_group_comparison_psd(epilepsy_results, control_results, output_dir)
+    
+    # Difference plot
+    plot_psd_difference(epilepsy_results, control_results, output_dir)
+    
+    # Band power comparison
+    plot_band_power_comparison(epilepsy_results, control_results, output_dir)
+    
+    # Save band powers as CSV (for GNN)
+    df = save_band_powers_csv(all_results, output_dir)
+    
+    # Summary report
+    create_summary_report(epilepsy_results, control_results, output_dir)
+    
+    # Calculate total elapsed time
+    total_time = time.time() - start_time
+    minutes = int(total_time // 60)
+    seconds = int(total_time % 60)
+    
+    # Final summary
+    print("\n" + "="*70)
+    print("ANALYSIS COMPLETE")
+    print("="*70)
+    print(f"Output directory: {output_dir}")
+    print(f"Total time: {minutes} minutes {seconds} seconds ({total_time:.1f}s)")
+    print(f"Average time per patient: {total_time/len(all_results):.2f} seconds")
+    print(f"\nKey outputs:")
+    print(f"  📊 group_comparison_psd.png - Main figure for thesis")
+    print(f"  📊 psd_difference.png - Statistical comparison")
+    print(f"  📊 band_power_comparison.png - Band power bar plot")
+    print(f"  📄 band_powers_all_patients.csv - Features for GNN ({df.shape[0]} patients × {df.shape[1]-4} features)")
+    print(f"  📄 analysis_summary.txt - Statistical results")
+    print("="*70 + "\n")
+
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--data_pp_dir", required=True, help="Folder with processed outputs (data_pp)")
-    ap.add_argument("--out_dir", required=True, help="Where to save group averages/plots")
-    ap.add_argument("--max_patients", type=int, default=None, help="Limit total subjects")
-    args = ap.parse_args()
-    main(args.data_pp_dir, args.out_dir, max_patients=args.max_patients)
+    main()
