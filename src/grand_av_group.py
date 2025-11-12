@@ -133,21 +133,33 @@ def compute_patient_psd(patient_id: str, epoch_files: list, label: int):
         Dictionary with psd_data, freqs, info, n_epochs, or None if failed
     """
     try:
-        # Load and concatenate all epochs
-        all_epochs = []
-        info = None
+        # Load info from first file
+        first_file = epoch_files[0]
+        pid = first_file.stem.replace("_epochs", "")
+        info_file = first_file.parent / f"{pid}_info.pkl"
+        with open(info_file, 'rb') as f:
+            info = pickle.load(f)
         
-        for i, epoch_file in enumerate(epoch_files):
+        # First pass: count total epochs to check memory requirements
+        total_epochs = 0
+        for epoch_file in epoch_files:
+            data = np.load(epoch_file, mmap_mode='r')  # Memory-map to check shape without loading
+            total_epochs += data.shape[0]
+        
+        # Memory check: if > 50,000 epochs, use chunked processing
+        MAX_EPOCHS_IN_MEMORY = 50000
+        
+        if total_epochs > MAX_EPOCHS_IN_MEMORY:
+            print(f"\n  ⚠️  {patient_id}: Large dataset ({total_epochs} epochs), using chunked processing...")
+            return compute_patient_psd_chunked(patient_id, epoch_files, label, info, total_epochs)
+        
+        # Normal processing for reasonable-sized datasets
+        all_epochs = []
+        for epoch_file in epoch_files:
             data = np.load(epoch_file)
             all_epochs.append(data)
-            
-            if i == 0:
-                pid = epoch_file.stem.replace("_epochs", "")
-                info_file = epoch_file.parent / f"{pid}_info.pkl"
-                with open(info_file, 'rb') as f:
-                    info = pickle.load(f)
         
-        if not all_epochs or info is None:
+        if not all_epochs:
             return None
         
         # Concatenate all epochs
@@ -175,6 +187,79 @@ def compute_patient_psd(patient_id: str, epoch_files: list, label: int):
         
     except Exception as e:
         print(f"  ✗ Error processing {patient_id}: {e}")
+        return None
+
+
+def compute_patient_psd_chunked(patient_id: str, epoch_files: list, label: int, info, total_epochs: int):
+    """
+    Compute PSD for patients with very large numbers of epochs using chunked processing.
+    
+    This avoids memory errors by processing files in chunks and averaging PSDs.
+    """
+    try:
+        # Process files in chunks and compute PSDs
+        all_psds = []
+        all_epoch_counts = []
+        
+        CHUNK_SIZE = 10000  # Process 10,000 epochs at a time
+        
+        current_chunk = []
+        current_chunk_size = 0
+        
+        for epoch_file in epoch_files:
+            data = np.load(epoch_file)
+            
+            # Add to current chunk
+            current_chunk.append(data)
+            current_chunk_size += data.shape[0]
+            
+            # If chunk is large enough, process it
+            if current_chunk_size >= CHUNK_SIZE:
+                chunk_data = np.concatenate(current_chunk, axis=0)
+                chunk_epochs = mne.EpochsArray(chunk_data, info, verbose=False)
+                chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+                chunk_avg_psd = chunk_psd.average()
+                
+                all_psds.append(chunk_avg_psd.get_data())
+                all_epoch_counts.append(chunk_data.shape[0])
+                
+                # Reset chunk
+                current_chunk = []
+                current_chunk_size = 0
+        
+        # Process remaining data
+        if current_chunk:
+            chunk_data = np.concatenate(current_chunk, axis=0)
+            chunk_epochs = mne.EpochsArray(chunk_data, info, verbose=False)
+            chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+            chunk_avg_psd = chunk_psd.average()
+            
+            all_psds.append(chunk_avg_psd.get_data())
+            all_epoch_counts.append(chunk_data.shape[0])
+        
+        # Weighted average of PSDs (weight by number of epochs in each chunk)
+        all_psds = np.array(all_psds)  # (n_chunks, n_channels, n_freqs)
+        weights = np.array(all_epoch_counts) / total_epochs  # Normalize weights
+        
+        # Compute weighted average
+        psd_data = np.average(all_psds, axis=0, weights=weights)
+        
+        # Get frequencies from last chunk
+        freqs = chunk_avg_psd.freqs
+        
+        print(f"  ✓ {patient_id}: Processed {len(all_psds)} chunks, {total_epochs} total epochs")
+        
+        return {
+            "psd_data": psd_data,
+            "freqs": freqs,
+            "info": info,
+            "n_epochs": total_epochs,
+            "label": label,
+            "patient_id": patient_id
+        }
+        
+    except Exception as e:
+        print(f"  ✗ Error in chunked processing for {patient_id}: {e}")
         return None
 
 
