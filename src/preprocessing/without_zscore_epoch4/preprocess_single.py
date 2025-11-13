@@ -94,8 +94,8 @@ Examples:
     parser.add_argument(
         "--epoch_len", 
         type=float, 
-        default=2.0,
-        help="Epoch duration in seconds (default: 2.0)"
+        default=4.0,
+        help="Epoch duration in seconds (default: 4.0)"
     )
     parser.add_argument(
         "--epoch_overlap", 
@@ -199,9 +199,9 @@ Examples:
     if not args.quiet:
         print(f"  ✓ {pid}_labels.npy")
     
-    np.save(out_dir / f"{pid}_raw.npy", res["raw_after"].get_data())
-    if not args.quiet:
-        print(f"  ✓ {pid}_raw.npy")
+    #np.save(out_dir / f"{pid}_raw.npy", res["raw_after"].get_data())
+    #if not args.quiet:
+    #    print(f"  ✓ {pid}_raw.npy")
     
     np.save(out_dir / f"{pid}_present_mask.npy", res["present_mask"])
     if not args.quiet:

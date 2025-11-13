@@ -131,7 +131,7 @@ def preprocess_single(
     notch: float = 60.0,
     band: Tuple[float, float] = (0.5, 100.0),
     resample_hz: float = 250.0,
-    epoch_len: float = 2.0,
+    epoch_len: float = 4.0,
     epoch_overlap: float = 0.0,
     reject_percentile: float = 98.0,
     reject_cap_uv: float = None,
@@ -351,21 +351,25 @@ def preprocess_single(
     
     # ========== 16. Z-SCORE NORMALIZATION ==========
     # Per-epoch, per-channel normalization across time
-    Xc = epochs_clean.get_data()
-    m = Xc.mean(axis=2, keepdims=True)
-    s = Xc.std(axis=2, keepdims=True)
-    s[s == 0] = 1.0  # Avoid division by zero
-    Xz = (Xc - m) / s
+    #Xc = epochs_clean.get_data()
+    #m = Xc.mean(axis=2, keepdims=True)
+    #s = Xc.std(axis=2, keepdims=True)
+    #s[s == 0] = 1.0  # Avoid division by zero
+    #Xz = (Xc - m) / s
     
-    epochs_final = mne.EpochsArray(
-        Xz, epochs_clean.info, events=epochs_clean.events,
-        tmin=epochs_clean.tmin, event_id=epochs_clean.event_id, 
-        on_missing='ignore', verbose="ERROR"
-    )
+    #epochs_final = mne.EpochsArray(
+    #    Xz, epochs_clean.info, events=epochs_clean.events,
+    #    tmin=epochs_clean.tmin, event_id=epochs_clean.event_id, 
+    #    on_missing='ignore', verbose="ERROR"
+    #)
     
+    #if verbose:
+    #    print(f"✓ Z-score normalization")
+    # No z-scoring to preserve amplitude relationships for MVAR
+    epochs_final = epochs_clean.copy()
+
     if verbose:
-        print(f"✓ Z-score normalization")
-    
+        print(f"✓ Skipped z-score normalization (for connectivity analysis)")
     # ========== 17. LABELS ==========
     label = infer_label_from_path(edf_path)
     y = np.full(len(epochs_final), label, dtype=int)

@@ -71,7 +71,7 @@ def save_preprocessed_file(pid: str, res: Dict, out_dir: Path, psd_dir: Path,
         # Save numpy arrays
         np.save(out_dir / f"{pid}_epochs.npy", res["epochs"].get_data())
         np.save(out_dir / f"{pid}_labels.npy", res["labels"])
-        np.save(out_dir / f"{pid}_raw.npy", res["raw_after"].get_data())
+        #np.save(out_dir / f"{pid}_raw.npy", res["raw_after"].get_data())
         np.save(out_dir / f"{pid}_present_mask.npy", res["present_mask"])
         
         # Save metadata
@@ -171,8 +171,8 @@ Examples:
     parser.add_argument(
         "--epoch_len", 
         type=float, 
-        default=2.0,
-        help="Epoch duration in seconds (default: 2.0)"
+        default=4.0,
+        help="Epoch duration in seconds (default: 4.0)"
     )
     parser.add_argument(
         "--epoch_overlap", 
