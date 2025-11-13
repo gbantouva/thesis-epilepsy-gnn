@@ -30,3 +30,4 @@ env/
 
 # Ignore logs if they get large
 logs/
+connectivity/connectivity_results/00_epilepsy/aaaaaanr/s002_2009/02_tcp_le/aaaaaanr_s002_t001_connectivity_metadata.json
