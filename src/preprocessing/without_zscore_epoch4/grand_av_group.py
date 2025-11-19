@@ -1,6 +1,11 @@
 """
 Batch Grand Average PSD Analysis: All Patients (Epilepsy vs Control)
 
+CORRECTED VERSION:
+- Fixed frequency range (45 Hz instead of 100 Hz for clinical bands)
+- Improved path detection
+- Added more robust error handling
+
 This script:
 1. Discovers all patients from directory structure
 2. Computes PSD grand average for each patient
@@ -11,11 +16,11 @@ This script:
 7. Extracts band power features for GNN
 
 Usage:
-  python grand_average_batch_psd.py --data_dir data_pp --output_dir figures/grand_average_analysis
+  python grand_average_batch_psd_corrected.py --data_dir data_pp --output_dir figures/grand_average_analysis
 
 Example:
-  python grand_average_batch_psd.py \
-    --data_dir F:\\October-Thesis\\thesis-epilepsy-gnn\\test\\data_pp \
+  python grand_average_batch_psd_corrected.py \
+    --data_dir F:\\October-Thesis\\thesis-epilepsy-gnn\\data_pp \
     --output_dir F:\\October-Thesis\\thesis-epilepsy-gnn\\figures\\grand_average_analysis \
     --max_patients 50
 """
@@ -35,6 +40,9 @@ import seaborn as sns
 # Set plot style
 sns.set_style("whitegrid")
 plt.rcParams['figure.dpi'] = 150
+
+# IMPORTANT: Set frequency range (matching Neuro-GPT and preprocessing)
+FMAX = 100.0  # Maximum frequency (Hz) - full preprocessed range
 
 
 def discover_patients(data_dir: Path):
@@ -56,35 +64,45 @@ def discover_patients(data_dir: Path):
     for epoch_file in all_epoch_files:
         try:
             # Get the full path as string for easier checking
-            full_path_str = str(epoch_file).replace('\\', '/')
+            full_path_str = str(epoch_file).replace('\\', '/').lower()
             
-            # Determine label from path
-            # Check for the actual directory names in your dataset
-            if '/00_epilepsy/' in full_path_str or '\\00_epilepsy\\' in str(epoch_file):
+            # Determine label from path (check multiple possible naming schemes)
+            if any(x in full_path_str for x in ['/00_epilepsy/', '\\00_epilepsy\\', '/epilepsy/', '\\epilepsy\\']):
                 label = 1  # Epilepsy
-            elif '/01_no_epilepsy/' in full_path_str or '\\01_no_epilepsy\\' in str(epoch_file):
-                label = 0  # Control (no epilepsy)
-            elif '/01_control/' in full_path_str or '\\01_control\\' in str(epoch_file):
-                label = 0  # Control (alternative name)
+            elif any(x in full_path_str for x in ['/01_no_epilepsy/', '\\01_no_epilepsy\\', '/01_control/', '\\01_control\\', '/control/', '\\control\\']):
+                label = 0  # Control
             else:
-                print(f"  ⚠️ Cannot determine label for: {epoch_file}")
-                continue
+                # Try to infer from labels.npy if path doesn't help
+                print(f"  ⚠️ Cannot determine label from path: {epoch_file}")
+                print(f"     Checking labels.npy...")
+                
+                pid = epoch_file.stem.replace("_epochs", "")
+                labels_file = epoch_file.parent / f"{pid}_labels.npy"
+                
+                if labels_file.exists():
+                    labels = np.load(labels_file)
+                    label = int(labels[0])  # Assume all epochs have same label
+                    print(f"     Found label from file: {label}")
+                else:
+                    print(f"     Skipping file (cannot determine label)")
+                    continue
             
-            # Extract patient ID from path
+            # Extract patient ID from filename or path
             try:
+                # Try to get relative path structure
                 rel_path = epoch_file.relative_to(data_dir)
                 parts = rel_path.parts
                 
                 # Structure: data_pp/00_epilepsy/PATIENT_ID/session/recording/file
                 # or:        data_pp/01_no_epilepsy/PATIENT_ID/session/recording/file
-                if len(parts) >= 2 and parts[0] in ["00_epilepsy", "01_no_epilepsy", "01_control"]:
-                    patient_id = parts[1]  # e.g., "aaaaaanr"
+                if len(parts) >= 2:
+                    patient_id = parts[1] if len(parts) > 1 else parts[0]
                 else:
                     # Fallback: extract from filename
                     filename = epoch_file.stem.replace("_epochs", "")
                     patient_id = filename.split('_')[0]
-            except ValueError:
-                # File not under data_dir
+            except (ValueError, IndexError):
+                # File not under data_dir or path issues
                 filename = epoch_file.stem.replace("_epochs", "")
                 patient_id = filename.split('_')[0]
             
@@ -109,13 +127,17 @@ def discover_patients(data_dir: Path):
     epilepsy_list = [(pid, data) for pid, data in patients.items() if data["label"] == 1]
     control_list = [(pid, data) for pid, data in patients.items() if data["label"] == 0]
     
-    print(f"\nFirst 3 EPILEPSY patients:")
-    for pid, data in epilepsy_list[:3]:
-        print(f"  {pid}: {len(data['files'])} files")
+    print(f"\nEpilepsy patients: {len(epilepsy_list)}")
+    if epilepsy_list:
+        print(f"First 3 examples:")
+        for pid, data in epilepsy_list[:3]:
+            print(f"  {pid}: {len(data['files'])} files, label={data['label']}")
     
-    print(f"\nFirst 3 CONTROL patients:")
-    for pid, data in control_list[:3]:
-        print(f"  {pid}: {len(data['files'])} files")
+    print(f"\nControl patients: {len(control_list)}")
+    if control_list:
+        print(f"First 3 examples:")
+        for pid, data in control_list[:3]:
+            print(f"  {pid}: {len(data['files'])} files, label={data['label']}")
     
     return dict(patients)
 
@@ -168,8 +190,8 @@ def compute_patient_psd(patient_id: str, epoch_files: list, label: int):
         # Create MNE Epochs object
         patient_epochs = mne.EpochsArray(all_data, info, verbose=False)
         
-        # Compute PSD
-        patient_psd = patient_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+        # Compute PSD (frequency-domain averaging)
+        patient_psd = patient_epochs.compute_psd(fmin=0.5, fmax=FMAX, verbose=False)
         patient_avg_psd = patient_psd.average()
         
         # Get data
@@ -217,7 +239,7 @@ def compute_patient_psd_chunked(patient_id: str, epoch_files: list, label: int, 
             if current_chunk_size >= CHUNK_SIZE:
                 chunk_data = np.concatenate(current_chunk, axis=0)
                 chunk_epochs = mne.EpochsArray(chunk_data, info, verbose=False)
-                chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+                chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=FMAX, verbose=False)
                 chunk_avg_psd = chunk_psd.average()
                 
                 all_psds.append(chunk_avg_psd.get_data())
@@ -231,7 +253,7 @@ def compute_patient_psd_chunked(patient_id: str, epoch_files: list, label: int, 
         if current_chunk:
             chunk_data = np.concatenate(current_chunk, axis=0)
             chunk_epochs = mne.EpochsArray(chunk_data, info, verbose=False)
-            chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
+            chunk_psd = chunk_epochs.compute_psd(fmin=0.5, fmax=FMAX, verbose=False)
             chunk_avg_psd = chunk_psd.average()
             
             all_psds.append(chunk_avg_psd.get_data())
@@ -279,7 +301,7 @@ def extract_band_powers(psd_data, freqs):
         'theta': (4, 8),
         'alpha': (8, 13),
         'beta': (13, 30),
-        'gamma': (30, 100)
+        'gamma': (30, 100)  # Full range matching preprocessing and Neuro-GPT
     }
     
     band_powers = {}
@@ -288,9 +310,13 @@ def extract_band_powers(psd_data, freqs):
         # Find frequency indices
         idx = np.where((freqs >= f_low) & (freqs <= f_high))[0]
         
-        # Integrate power in band (mean across frequencies)
-        band_power = np.mean(psd_data[:, idx], axis=1)  # (n_channels,)
-        band_powers[band_name] = band_power
+        if len(idx) == 0:
+            # Band not available in frequency range
+            band_powers[band_name] = np.zeros(psd_data.shape[0])
+        else:
+            # Integrate power in band (mean across frequencies)
+            band_power = np.mean(psd_data[:, idx], axis=1)  # (n_channels,)
+            band_powers[band_name] = band_power
     
     return band_powers
 
@@ -298,8 +324,6 @@ def extract_band_powers(psd_data, freqs):
 def plot_group_comparison_psd(epilepsy_results, control_results, output_dir):
     """
     Create publication-quality PSD comparison figure (Epilepsy vs Control).
-    
-    Similar to Figure 1 in the reference paper.
     """
     print("\nGenerating group comparison plots...")
     
@@ -339,12 +363,12 @@ def plot_group_comparison_psd(epilepsy_results, control_results, output_dir):
             alpha=0.2
         )
     
-    ax.set_ylabel("Power Spectral Density", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Power Spectral Density (V²/Hz)", fontsize=12, fontweight='bold')
     ax.set_title(f"EPILEPSY GROUP (n={len(epilepsy_results)} patients)", 
                 fontsize=14, fontweight='bold', color='red')
     ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, FMAX])
     
     # Mark frequency bands
     bands = {
@@ -352,7 +376,7 @@ def plot_group_comparison_psd(epilepsy_results, control_results, output_dir):
         'Theta': (4, 8),
         'Alpha': (8, 13),
         'Beta': (13, 30),
-        'Gamma': (30, 100)
+        'Gamma': (30, FMAX)
     }
     
     y_min, y_max = ax.get_ylim()
@@ -378,18 +402,18 @@ def plot_group_comparison_psd(epilepsy_results, control_results, output_dir):
         )
     
     ax.set_xlabel("Frequency (Hz)", fontsize=12, fontweight='bold')
-    ax.set_ylabel("Power Spectral Density", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Power Spectral Density (V²/Hz)", fontsize=12, fontweight='bold')
     ax.set_title(f"CONTROL GROUP (n={len(control_results)} patients)",
                 fontsize=14, fontweight='bold', color='blue')
     ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, FMAX])
     
     # Mark frequency bands
     for band_name, (f_low, f_high) in bands.items():
         ax.axvspan(f_low, f_high, alpha=0.05, color='gray')
     
-    plt.suptitle("Grand Average PSD: Group Comparison", 
+    plt.suptitle("Grand Average PSD: Group Comparison (Frequency-Domain Averaging)", 
                 fontsize=16, fontweight='bold', y=0.995)
     plt.tight_layout()
     
@@ -459,7 +483,7 @@ def plot_psd_difference(epilepsy_results, control_results, output_dir):
         'Theta': (4, 8),
         'Alpha': (8, 13),
         'Beta': (13, 30),
-        'Gamma': (30, 100)
+        'Gamma': (30, FMAX)
     }
     
     y_min, y_max = ax.get_ylim()
@@ -470,10 +494,10 @@ def plot_psd_difference(epilepsy_results, control_results, output_dir):
     
     ax.axhline(0, color='k', linestyle='--', linewidth=1)
     ax.set_xlabel("Frequency (Hz)", fontsize=12, fontweight='bold')
-    ax.set_ylabel("PSD Difference (Epilepsy - Control)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("PSD Difference (Epilepsy - Control) [V²/Hz]", fontsize=12, fontweight='bold')
     ax.set_title("PSD Difference with Statistical Significance (p < 0.05)", 
                 fontsize=14, fontweight='bold')
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, FMAX])
     ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3)
     
@@ -543,7 +567,7 @@ def plot_band_power_comparison(epilepsy_results, control_results, output_dir):
         ax.text(i, y_pos * 1.1, marker, ha='center', fontsize=12, fontweight='bold')
     
     ax.set_xlabel("Frequency Band", fontsize=12, fontweight='bold')
-    ax.set_ylabel("Mean Power (averaged across channels)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Mean Power (averaged across channels) [V²/Hz]", fontsize=12, fontweight='bold')
     ax.set_title("Band Power Comparison: Epilepsy vs Control\n(* p<0.05, ** p<0.01, *** p<0.001)",
                 fontsize=14, fontweight='bold')
     ax.set_xticks(x)
@@ -617,7 +641,10 @@ def create_summary_report(epilepsy_results, control_results, output_dir):
     with open(report_path, 'w') as f:
         f.write("="*70 + "\n")
         f.write("GRAND AVERAGE PSD ANALYSIS - SUMMARY REPORT\n")
+        f.write("(Frequency-Domain Averaging: PSD per epoch → average PSDs)\n")
         f.write("="*70 + "\n\n")
+        
+        f.write(f"FREQUENCY RANGE: 0.5 - {FMAX} Hz (clinical bands)\n\n")
         
         f.write("SAMPLE SIZES:\n")
         f.write(f"  Epilepsy patients: {len(epilepsy_results)}\n")
@@ -651,8 +678,8 @@ def create_summary_report(epilepsy_results, control_results, output_dir):
             )
             
             f.write(f"\n  {band.upper()}:\n")
-            f.write(f"    Epilepsy: {np.mean(epi_powers):.4f} ± {np.std(epi_powers):.4f}\n")
-            f.write(f"    Control:  {np.mean(ctrl_powers):.4f} ± {np.std(ctrl_powers):.4f}\n")
+            f.write(f"    Epilepsy: {np.mean(epi_powers):.6e} ± {np.std(epi_powers):.6e} V²/Hz\n")
+            f.write(f"    Control:  {np.mean(ctrl_powers):.6e} ± {np.std(ctrl_powers):.6e} V²/Hz\n")
             f.write(f"    t-statistic: {t_stat:.3f}\n")
             f.write(f"    p-value: {p_val:.6f}\n")
             f.write(f"    Cohen's d: {cohen_d:.3f}\n")
@@ -672,7 +699,8 @@ def create_summary_report(epilepsy_results, control_results, output_dir):
         f.write("  - psd_difference.png: Difference plot with significance\n")
         f.write("  - band_power_comparison.png: Bar plot by frequency band\n")
         f.write("  - band_powers_all_patients.csv: Features for GNN\n")
-        f.write("  - individual_patients/: PSD data for each patient\n")
+        if Path(output_dir / "individual_patients").exists():
+            f.write("  - individual_patients/: PSD data for each patient\n")
         f.write("="*70 + "\n")
     
     print(f"  ✓ Saved: analysis_summary.txt")
@@ -727,6 +755,7 @@ def main():
     
     print("\n" + "="*70)
     print("BATCH GRAND AVERAGE PSD ANALYSIS")
+    print(f"(Frequency-Domain Averaging: 0.5-{FMAX} Hz)")
     print("="*70)
     
     # Discover patients

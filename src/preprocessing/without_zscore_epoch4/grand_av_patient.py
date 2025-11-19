@@ -1,8 +1,10 @@
 """
 Calculate grand average PSD for ONE patient (all their epoch files combined).
 
+CORRECTED VERSION: Fixed misleading comment about z-scoring.
+
 Usage:
-  python src\grand_av_patient.py --patient_id aaaaaanr --data_dir F:\October-Thesis\thesis-epilepsy-gnn\test\data_pp --output_dir F:\October-Thesis\thesis-epilepsy-gnn\test\figures\grand_average\single_patient
+  python grand_av_patient.py --patient_id aaaaaanr --data_dir data_pp --output_dir figures/grand_average/single_patient
 """
 
 import mne
@@ -77,11 +79,12 @@ def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, outp
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # ========== STEP 4: FREQUENCY-DOMAIN GRAND AVERAGE (PSD) ==========
-    print("\nStep 4: Computing FREQUENCY-DOMAIN grand average (PSD)...")
-    print("ℹ️  NOTE: Time-domain averaging is skipped because data is z-scored (unitless).")
+    # ========== STEP 4: COMPUTE PSD GRAND AVERAGE ==========
+    print("\nStep 4: Computing PSD grand average (frequency-domain averaging)...")
+    print("ℹ️  NOTE: This computes PSD per epoch, then averages PSDs (standard approach).")
+    print("          Time-domain averaging is NOT needed for resting-state analysis.")
     
-    # Compute PSD
+    # Compute PSD per epoch, then average
     patient_psd = patient_epochs.compute_psd(fmin=0.5, fmax=100.0, verbose=False)
     patient_avg_psd = patient_psd.average()
     
@@ -89,6 +92,7 @@ def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, outp
     psd_data = patient_avg_psd.get_data()  # (n_channels, n_freqs)
     freqs = patient_avg_psd.freqs
     print(f"✓ PSD grand average shape: {psd_data.shape}")
+    print(f"  Frequency range: {freqs[0]:.1f} - {freqs[-1]:.1f} Hz")
     
     # Save as .npy
     np.save(output_dir / f"{patient_id}_psd_grand_avg.npy", psd_data)
@@ -107,7 +111,7 @@ def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, outp
         idx = ch_names.index(ch)
         ax.semilogy(freqs, psd_data[idx], label=ch, alpha=0.8, linewidth=1.5)
     
-    # Mark frequency bands
+    # Mark frequency bands (updated to 100 Hz max)
     bands = {
         'Delta': (0.5, 4),
         'Theta': (4, 8),
@@ -123,7 +127,7 @@ def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, outp
                ha='center', fontsize=10, fontweight='bold')
     
     ax.set_xlabel("Frequency (Hz)", fontsize=12)
-    ax.set_ylabel("Power Spectral Density", fontsize=12)
+    ax.set_ylabel("Power Spectral Density (V²/Hz)", fontsize=12)
     ax.set_title(f"Patient {patient_id} - PSD Grand Average", 
                 fontsize=14, fontweight='bold')
     ax.set_xlim([0, 100])
@@ -144,6 +148,7 @@ def calculate_single_patient_grand_average(patient_id: str, data_dir: Path, outp
     print(f"Channels:           {all_data.shape[1]}")
     print(f"Timepoints/epoch:   {all_data.shape[2]}")
     print(f"Sampling rate:      {info['sfreq']} Hz")
+    print(f"Frequency range:    {freqs[0]:.1f} - {freqs[-1]:.1f} Hz")
     print(f"Output directory:   {output_dir}")
     print(f"{'='*70}\n")
 
