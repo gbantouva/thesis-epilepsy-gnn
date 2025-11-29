@@ -1,0 +1,710 @@
+{
+  "random_seed": 42,
+  "target_ratio": 0.191,
+  "total_patients": 100,
+  "total_selected_sessions": 135,
+  "estimated_total_hours": 115.69564031647369,
+  "original_total_hours": 530.4,
+  "per_patient_selection": {
+    "aaaaaanr": {
+      "total_sessions": 22,
+      "selected_sessions": 4,
+      "percentage": 18.181818181818183,
+      "total_duration_hours": 23.83861111111111,
+      "estimated_duration_hours": 4.334292929292929
+    },
+    "aaaaaawu": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 1.9413888888888888,
+      "estimated_duration_hours": 0.3882777777777778
+    },
+    "aaaaabdn": {
+      "total_sessions": 10,
+      "selected_sessions": 2,
+      "percentage": 20.0,
+      "total_duration_hours": 8.067499999999999,
+      "estimated_duration_hours": 1.6134999999999997
+    },
+    "aaaaabhz": {
+      "total_sessions": 28,
+      "selected_sessions": 5,
+      "percentage": 17.857142857142858,
+      "total_duration_hours": 121.54416666666667,
+      "estimated_duration_hours": 21.704315476190477
+    },
+    "aaaaabju": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.14,
+      "estimated_duration_hours": 0.37999999999999995
+    },
+    "aaaaacrz": {
+      "total_sessions": 6,
+      "selected_sessions": 1,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 4.180000000000001,
+      "estimated_duration_hours": 0.6966666666666668
+    },
+    "aaaaadkv": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0905555555555555,
+      "estimated_duration_hours": 0.3635185185185185
+    },
+    "aaaaaelp": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 2.4252777777777776,
+      "estimated_duration_hours": 0.3464682539682539
+    },
+    "aaaaaeph": {
+      "total_sessions": 6,
+      "selected_sessions": 1,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 2.7327777777777778,
+      "estimated_duration_hours": 0.45546296296296296
+    },
+    "aaaaaeqq": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 1.7447222222222223,
+      "estimated_duration_hours": 0.34894444444444445
+    },
+    "aaaaaewf": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.2236111111111112,
+      "estimated_duration_hours": 0.4078703703703704
+    },
+    "aaaaafif": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 1.4569444444444444,
+      "estimated_duration_hours": 0.3642361111111111
+    },
+    "aaaaaflb": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 2.2875,
+      "estimated_duration_hours": 0.4575
+    },
+    "aaaaagnh": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.8097222222222222,
+      "estimated_duration_hours": 0.4048611111111111
+    },
+    "aaaaagxr": {
+      "total_sessions": 22,
+      "selected_sessions": 4,
+      "percentage": 18.181818181818183,
+      "total_duration_hours": 31.86527777777778,
+      "estimated_duration_hours": 5.793686868686869
+    },
+    "aaaaaicb": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7347222222222222,
+      "estimated_duration_hours": 0.3673611111111111
+    },
+    "aaaaaiek": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0552777777777778,
+      "estimated_duration_hours": 0.35175925925925927
+    },
+    "aaaaaifn": {
+      "total_sessions": 8,
+      "selected_sessions": 2,
+      "percentage": 25.0,
+      "total_duration_hours": 3.0652777777777778,
+      "estimated_duration_hours": 0.7663194444444444
+    },
+    "aaaaaifp": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 1.8211111111111111,
+      "estimated_duration_hours": 0.3642222222222222
+    },
+    "aaaaaiiz": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7722222222222223,
+      "estimated_duration_hours": 0.3861111111111111
+    },
+    "aaaaaimz": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 1.4477777777777778,
+      "estimated_duration_hours": 0.36194444444444446
+    },
+    "aaaaaint": {
+      "total_sessions": 6,
+      "selected_sessions": 1,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 2.0933333333333333,
+      "estimated_duration_hours": 0.34888888888888886
+    },
+    "aaaaaiud": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0002777777777778,
+      "estimated_duration_hours": 0.33342592592592596
+    },
+    "aaaaajat": {
+      "total_sessions": 18,
+      "selected_sessions": 3,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 13.413611111111111,
+      "estimated_duration_hours": 2.2356018518518517
+    },
+    "aaaaajbn": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0769444444444445,
+      "estimated_duration_hours": 0.3589814814814815
+    },
+    "aaaaajqo": {
+      "total_sessions": 32,
+      "selected_sessions": 6,
+      "percentage": 18.75,
+      "total_duration_hours": 33.20777777777778,
+      "estimated_duration_hours": 6.226458333333333
+    },
+    "aaaaajud": {
+      "total_sessions": 11,
+      "selected_sessions": 2,
+      "percentage": 18.181818181818183,
+      "total_duration_hours": 5.969166666666667,
+      "estimated_duration_hours": 1.0853030303030304
+    },
+    "aaaaajus": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.2225000000000001,
+      "estimated_duration_hours": 0.40750000000000003
+    },
+    "aaaaakbt": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.2822222222222222,
+      "estimated_duration_hours": 0.4274074074074074
+    },
+    "aaaaakfe": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.176111111111111,
+      "estimated_duration_hours": 0.392037037037037
+    },
+    "aaaaakgl": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0877777777777777,
+      "estimated_duration_hours": 0.3625925925925926
+    },
+    "aaaaakgy": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.33888888888888885,
+      "estimated_duration_hours": 0.33888888888888885
+    },
+    "aaaaaklt": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0897222222222223,
+      "estimated_duration_hours": 0.36324074074074075
+    },
+    "aaaaaklv": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 0.9938888888888888,
+      "estimated_duration_hours": 0.33129629629629626
+    },
+    "aaaaakoq": {
+      "total_sessions": 12,
+      "selected_sessions": 2,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 13.04,
+      "estimated_duration_hours": 2.1733333333333333
+    },
+    "aaaaakqa": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 1.4733333333333334,
+      "estimated_duration_hours": 0.36833333333333335
+    },
+    "aaaaakqq": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 1.888611111111111,
+      "estimated_duration_hours": 0.3777222222222222
+    },
+    "aaaaaktn": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7430555555555555,
+      "estimated_duration_hours": 0.37152777777777773
+    },
+    "aaaaakvr": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.40861111111111115,
+      "estimated_duration_hours": 0.40861111111111115
+    },
+    "aaaaakyc": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.37166666666666665,
+      "estimated_duration_hours": 0.37166666666666665
+    },
+    "aaaaalfg": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 4.019166666666667,
+      "estimated_duration_hours": 0.5741666666666667
+    },
+    "aaaaalgi": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.4741666666666668,
+      "estimated_duration_hours": 0.49138888888888893
+    },
+    "aaaaalhr": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.355,
+      "estimated_duration_hours": 0.355
+    },
+    "aaaaalib": {
+      "total_sessions": 15,
+      "selected_sessions": 3,
+      "percentage": 20.0,
+      "total_duration_hours": 14.507222222222222,
+      "estimated_duration_hours": 2.9014444444444445
+    },
+    "aaaaalim": {
+      "total_sessions": 12,
+      "selected_sessions": 2,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 9.747777777777777,
+      "estimated_duration_hours": 1.6246296296296296
+    },
+    "aaaaaliw": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.5733333333333333,
+      "estimated_duration_hours": 0.5244444444444444
+    },
+    "aaaaalof": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3347222222222222,
+      "estimated_duration_hours": 0.3347222222222222
+    },
+    "aaaaalon": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7691666666666667,
+      "estimated_duration_hours": 0.38458333333333333
+    },
+    "aaaaalqm": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 1.5880555555555558,
+      "estimated_duration_hours": 0.39701388888888894
+    },
+    "aaaaalug": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7177777777777777,
+      "estimated_duration_hours": 0.35888888888888887
+    },
+    "aaaaaluq": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.6675,
+      "estimated_duration_hours": 0.33375
+    },
+    "aaaaalzg": {
+      "total_sessions": 26,
+      "selected_sessions": 5,
+      "percentage": 19.23076923076923,
+      "total_duration_hours": 19.825555555555557,
+      "estimated_duration_hours": 3.812606837606838
+    },
+    "aaaaamde": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 2.7713888888888887,
+      "estimated_duration_hours": 0.3959126984126984
+    },
+    "aaaaamgc": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7391666666666666,
+      "estimated_duration_hours": 0.3695833333333333
+    },
+    "aaaaamhb": {
+      "total_sessions": 13,
+      "selected_sessions": 2,
+      "percentage": 15.384615384615385,
+      "total_duration_hours": 12.597777777777779,
+      "estimated_duration_hours": 1.9381196581196583
+    },
+    "aaaaamic": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.6727777777777777,
+      "estimated_duration_hours": 0.33638888888888885
+    },
+    "aaaaamkx": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.4027777777777778,
+      "estimated_duration_hours": 0.4027777777777778
+    },
+    "aaaaamlf": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 1.1725,
+      "estimated_duration_hours": 0.58625
+    },
+    "aaaaamlm": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3461111111111111,
+      "estimated_duration_hours": 0.3461111111111111
+    },
+    "aaaaamnj": {
+      "total_sessions": 13,
+      "selected_sessions": 2,
+      "percentage": 15.384615384615385,
+      "total_duration_hours": 13.895555555555555,
+      "estimated_duration_hours": 2.1377777777777776
+    },
+    "aaaaamoa": {
+      "total_sessions": 8,
+      "selected_sessions": 2,
+      "percentage": 25.0,
+      "total_duration_hours": 15.29111111111111,
+      "estimated_duration_hours": 3.8227777777777776
+    },
+    "aaaaamor": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.33499999999999996,
+      "estimated_duration_hours": 0.33499999999999996
+    },
+    "aaaaamrq": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3372222222222222,
+      "estimated_duration_hours": 0.3372222222222222
+    },
+    "aaaaamsw": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.1455555555555554,
+      "estimated_duration_hours": 0.38185185185185183
+    },
+    "aaaaamtl": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 4.085277777777778,
+      "estimated_duration_hours": 0.8170555555555555
+    },
+    "aaaaamuy": {
+      "total_sessions": 11,
+      "selected_sessions": 2,
+      "percentage": 18.181818181818183,
+      "total_duration_hours": 8.354444444444445,
+      "estimated_duration_hours": 1.5189898989898991
+    },
+    "aaaaamys": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.5005555555555555,
+      "estimated_duration_hours": 0.5005555555555555
+    },
+    "aaaaanag": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.6830555555555555,
+      "estimated_duration_hours": 0.34152777777777776
+    },
+    "aaaaandx": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 6.768055555555556,
+      "estimated_duration_hours": 1.353611111111111
+    },
+    "aaaaanfk": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 3.0822222222222226,
+      "estimated_duration_hours": 0.7705555555555557
+    },
+    "aaaaanfl": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.35416666666666663,
+      "estimated_duration_hours": 0.35416666666666663
+    },
+    "aaaaanhr": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.35388888888888886,
+      "estimated_duration_hours": 0.35388888888888886
+    },
+    "aaaaanjh": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 3.528888888888889,
+      "estimated_duration_hours": 1.1762962962962964
+    },
+    "aaaaankz": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 2.7716666666666665,
+      "estimated_duration_hours": 0.5543333333333333
+    },
+    "aaaaanmf": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3955555555555556,
+      "estimated_duration_hours": 0.3955555555555556
+    },
+    "aaaaannz": {
+      "total_sessions": 9,
+      "selected_sessions": 2,
+      "percentage": 22.22222222222222,
+      "total_duration_hours": 7.559444444444444,
+      "estimated_duration_hours": 1.6798765432098763
+    },
+    "aaaaanog": {
+      "total_sessions": 10,
+      "selected_sessions": 2,
+      "percentage": 20.0,
+      "total_duration_hours": 8.13361111111111,
+      "estimated_duration_hours": 1.626722222222222
+    },
+    "aaaaanwn": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 12.992222222222221,
+      "estimated_duration_hours": 3.2480555555555553
+    },
+    "aaaaanzp": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.35388888888888886,
+      "estimated_duration_hours": 0.35388888888888886
+    },
+    "aaaaaock": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7547222222222222,
+      "estimated_duration_hours": 0.3773611111111111
+    },
+    "aaaaaocl": {
+      "total_sessions": 6,
+      "selected_sessions": 1,
+      "percentage": 16.666666666666668,
+      "total_duration_hours": 5.090833333333333,
+      "estimated_duration_hours": 0.8484722222222222
+    },
+    "aaaaaodl": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.36722222222222217,
+      "estimated_duration_hours": 0.36722222222222217
+    },
+    "aaaaaogc": {
+      "total_sessions": 3,
+      "selected_sessions": 1,
+      "percentage": 33.333333333333336,
+      "total_duration_hours": 1.0847222222222221,
+      "estimated_duration_hours": 0.36157407407407405
+    },
+    "aaaaaokm": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 3.3519444444444444,
+      "estimated_duration_hours": 3.3519444444444444
+    },
+    "aaaaaoom": {
+      "total_sessions": 8,
+      "selected_sessions": 2,
+      "percentage": 25.0,
+      "total_duration_hours": 11.413055555555555,
+      "estimated_duration_hours": 2.853263888888889
+    },
+    "aaaaaooo": {
+      "total_sessions": 5,
+      "selected_sessions": 1,
+      "percentage": 20.0,
+      "total_duration_hours": 9.455555555555556,
+      "estimated_duration_hours": 1.8911111111111112
+    },
+    "aaaaaoou": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.36777777777777776,
+      "estimated_duration_hours": 0.36777777777777776
+    },
+    "aaaaaotl": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.41694444444444445,
+      "estimated_duration_hours": 0.41694444444444445
+    },
+    "aaaaaoui": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.7341666666666666,
+      "estimated_duration_hours": 0.3670833333333333
+    },
+    "aaaaaovm": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 8.7725,
+      "estimated_duration_hours": 1.2532142857142858
+    },
+    "aaaaaowq": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 7.949166666666667,
+      "estimated_duration_hours": 1.135595238095238
+    },
+    "aaaaaozy": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.4172222222222222,
+      "estimated_duration_hours": 0.4172222222222222
+    },
+    "aaaaapfa": {
+      "total_sessions": 4,
+      "selected_sessions": 1,
+      "percentage": 25.0,
+      "total_duration_hours": 6.973333333333334,
+      "estimated_duration_hours": 1.7433333333333334
+    },
+    "aaaaapge": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.40972222222222227,
+      "estimated_duration_hours": 0.40972222222222227
+    },
+    "aaaaaphz": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3516666666666666,
+      "estimated_duration_hours": 0.3516666666666666
+    },
+    "aaaaapjn": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.38027777777777777,
+      "estimated_duration_hours": 0.38027777777777777
+    },
+    "aaaaapkm": {
+      "total_sessions": 7,
+      "selected_sessions": 1,
+      "percentage": 14.285714285714286,
+      "total_duration_hours": 8.119444444444445,
+      "estimated_duration_hours": 1.159920634920635
+    },
+    "aaaaapri": {
+      "total_sessions": 2,
+      "selected_sessions": 1,
+      "percentage": 50.0,
+      "total_duration_hours": 0.8347222222222223,
+      "estimated_duration_hours": 0.4173611111111111
+    },
+    "aaaaapvx": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.38861111111111113,
+      "estimated_duration_hours": 0.38861111111111113
+    },
+    "aaaaapwd": {
+      "total_sessions": 1,
+      "selected_sessions": 1,
+      "percentage": 100.0,
+      "total_duration_hours": 0.3683333333333333,
+      "estimated_duration_hours": 0.3683333333333333
+    }
+  }
+}
