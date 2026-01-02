@@ -37,3 +37,7 @@ connectivity/
 data_pp_balanced/
 
 data_raw_balanced/
+
+analysis_results/
+
+analysis_results_balanced/
