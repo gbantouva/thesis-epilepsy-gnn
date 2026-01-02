@@ -33,3 +33,7 @@ logs/
 
 # Ignore the entire connectivity folder
 connectivity/
+
+data_pp_balanced/
+
+data_raw_balanced/
