@@ -1,9 +1,10 @@
 """
-CONNECTIVITY RESULTS ANALYZER - CORRECTED VERSION
-==================================================
+CONNECTIVITY RESULTS ANALYZER - CORRECTED VERSION WITH GROUP COMPARISON
+========================================================================
 Generates statistics and plots for professor meeting
 FIXED: Channel names (T1/T2 instead of A1/A2)
 FIXED: Multi-band support
+NEW: Figure 4 - Epilepsy vs Control per-band comparison
 """
 import numpy as np
 from pathlib import Path
@@ -47,14 +48,23 @@ n_epochs_per_file = []
 epilepsy_orders = []
 control_orders = []
 
-# Per-band statistics
+# Per-band statistics (overall)
 band_names = ['integrated', 'delta', 'theta', 'alpha', 'beta', 'gamma1', 'gamma2']
 band_stats = {band: {'max_pdc': [], 'max_dtf': [], 'mean_pdc': [], 'mean_dtf': []} 
               for band in band_names}
 
+# Per-band statistics separated by group (NEW!)
+epilepsy_band_stats = {band: {'max_pdc': [], 'max_dtf': [], 'mean_pdc': [], 'mean_dtf': []} 
+                       for band in band_names}
+control_band_stats = {band: {'max_pdc': [], 'max_dtf': [], 'mean_pdc': [], 'mean_dtf': []} 
+                      for band in band_names}
+
 for f in all_files:
     try:
         data = np.load(f)
+        
+        # Determine group
+        is_epilepsy = '00_epilepsy' in str(f)
         
         # Basic stats
         all_orders.extend(data['orders'])
@@ -69,13 +79,31 @@ for f in all_files:
         
         # Per-band statistics
         for band in band_names:
-            band_stats[band]['max_pdc'].extend(data[f'pdc_{band}'].max(axis=(1,2)))
-            band_stats[band]['max_dtf'].extend(data[f'dtf_{band}'].max(axis=(1,2)))
-            band_stats[band]['mean_pdc'].extend(data[f'pdc_{band}'].mean(axis=(1,2)))
-            band_stats[band]['mean_dtf'].extend(data[f'dtf_{band}'].mean(axis=(1,2)))
+            max_pdc = data[f'pdc_{band}'].max(axis=(1,2))
+            max_dtf = data[f'dtf_{band}'].max(axis=(1,2))
+            mean_pdc = data[f'pdc_{band}'].mean(axis=(1,2))
+            mean_dtf = data[f'dtf_{band}'].mean(axis=(1,2))
+            
+            # Overall
+            band_stats[band]['max_pdc'].extend(max_pdc)
+            band_stats[band]['max_dtf'].extend(max_dtf)
+            band_stats[band]['mean_pdc'].extend(mean_pdc)
+            band_stats[band]['mean_dtf'].extend(mean_dtf)
+            
+            # Separated by group (NEW!)
+            if is_epilepsy:
+                epilepsy_band_stats[band]['max_pdc'].extend(max_pdc)
+                epilepsy_band_stats[band]['max_dtf'].extend(max_dtf)
+                epilepsy_band_stats[band]['mean_pdc'].extend(mean_pdc)
+                epilepsy_band_stats[band]['mean_dtf'].extend(mean_dtf)
+            else:
+                control_band_stats[band]['max_pdc'].extend(max_pdc)
+                control_band_stats[band]['max_dtf'].extend(max_dtf)
+                control_band_stats[band]['mean_pdc'].extend(mean_pdc)
+                control_band_stats[band]['mean_dtf'].extend(mean_dtf)
         
-        # Group by label
-        if '00_epilepsy' in str(f):
+        # Group by label (for orders)
+        if is_epilepsy:
             epilepsy_orders.extend(data['orders'])
         else:
             control_orders.extend(data['orders'])
@@ -240,9 +268,6 @@ ax6.legend()
 ax6.grid(True, alpha=0.3, axis='y')
 
 plt.tight_layout()
-#plt.savefig('connectivity_comprehensive_analysis.png', dpi=300, bbox_inches='tight')
-#print("\n✅ Saved: connectivity_comprehensive_analysis.png")
-
 plt.savefig(output_dir / 'connectivity_comprehensive_analysis.png', dpi=300, bbox_inches='tight')
 print(f"✅ Saved: {output_dir / 'connectivity_comprehensive_analysis.png'}")
 
@@ -263,8 +288,6 @@ axes[0].legend(fontsize=11)
 axes[0].grid(True, alpha=0.3, axis='y')
 
 # Box plot comparison
-#bp = axes[1].boxplot([epilepsy_orders, control_orders], tick_labels=['Epilepsy', 'Control'], ...)
-#bp = axes[1].boxplot([epilepsy_orders, control_orders], labels=['Epilepsy', 'Control'],
 bp = axes[1].boxplot([epilepsy_orders, control_orders], tick_labels=['Epilepsy', 'Control'],
                       patch_artist=True, 
                       boxprops=dict(facecolor='lightblue'),
@@ -275,14 +298,11 @@ axes[1].set_title(f'Order Statistics\nEpilepsy: {epilepsy_orders.mean():.2f}±{e
 axes[1].grid(True, alpha=0.3, axis='y')
 
 plt.tight_layout()
-#plt.savefig('order_comparison_groups.png', dpi=300, bbox_inches='tight')
-#print("✅ Saved: order_comparison_groups.png")
-
 plt.savefig(output_dir / 'order_comparison_groups.png', dpi=300, bbox_inches='tight')
 print(f"✅ Saved: {output_dir / 'order_comparison_groups.png'}")
 
 # ============================================================================
-# Figure 3: Per-Band Comparison (NEW!)
+# Figure 3: Per-Band Comparison (Overall)
 # ============================================================================
 
 fig3, axes = plt.subplots(2, 1, figsize=(14, 10))
@@ -318,16 +338,142 @@ axes[1].legend()
 axes[1].grid(True, alpha=0.3, axis='y')
 
 plt.tight_layout()
-#plt.savefig('per_band_connectivity_comparison.png', dpi=300, bbox_inches='tight')
-#print("✅ Saved: per_band_connectivity_comparison.png")
-
 plt.savefig(output_dir / 'per_band_connectivity_comparison.png', dpi=300, bbox_inches='tight')
 print(f"✅ Saved: {output_dir / 'per_band_connectivity_comparison.png'}")
+
+# ============================================================================
+# Figure 4: EPILEPSY vs CONTROL PER-BAND COMPARISON (NEW!)
+# ============================================================================
+
+fig4, axes = plt.subplots(2, 2, figsize=(16, 12))
+
+# Prepare data for plotting
+epilepsy_max_pdc = [np.mean(epilepsy_band_stats[band]['max_pdc']) for band in band_names]
+control_max_pdc = [np.mean(control_band_stats[band]['max_pdc']) for band in band_names]
+
+epilepsy_max_dtf = [np.mean(epilepsy_band_stats[band]['max_dtf']) for band in band_names]
+control_max_dtf = [np.mean(control_band_stats[band]['max_dtf']) for band in band_names]
+
+epilepsy_mean_pdc = [np.mean(epilepsy_band_stats[band]['mean_pdc']) for band in band_names]
+control_mean_pdc = [np.mean(control_band_stats[band]['mean_pdc']) for band in band_names]
+
+epilepsy_mean_dtf = [np.mean(epilepsy_band_stats[band]['mean_dtf']) for band in band_names]
+control_mean_dtf = [np.mean(control_band_stats[band]['mean_dtf']) for band in band_names]
+
+x = np.arange(len(band_names))
+width = 0.35
+
+# Panel 1: Max PDC
+axes[0, 0].bar(x - width/2, epilepsy_max_pdc, width, label='Epilepsy', color='red', alpha=0.7, edgecolor='black')
+axes[0, 0].bar(x + width/2, control_max_pdc, width, label='Control', color='blue', alpha=0.7, edgecolor='black')
+axes[0, 0].set_ylabel('Mean Maximum PDC', fontsize=12, fontweight='bold')
+axes[0, 0].set_title('Maximum PDC Values: Epilepsy vs Control', fontsize=13, fontweight='bold')
+axes[0, 0].set_xticks(x)
+axes[0, 0].set_xticklabels(band_labels, rotation=45, ha='right')
+axes[0, 0].legend(fontsize=11)
+axes[0, 0].grid(True, alpha=0.3, axis='y')
+axes[0, 0].set_ylim([0.7, 0.9])
+
+# Add difference annotations
+for i, band in enumerate(band_names):
+    diff = epilepsy_max_pdc[i] - control_max_pdc[i]
+    y_pos = max(epilepsy_max_pdc[i], control_max_pdc[i]) + 0.005
+    color = 'red' if diff > 0 else 'blue'
+    axes[0, 0].text(i, y_pos, f'{diff:+.3f}', ha='center', va='bottom', fontsize=8, color=color, fontweight='bold')
+
+# Panel 2: Max DTF
+axes[0, 1].bar(x - width/2, epilepsy_max_dtf, width, label='Epilepsy', color='red', alpha=0.7, edgecolor='black')
+axes[0, 1].bar(x + width/2, control_max_dtf, width, label='Control', color='blue', alpha=0.7, edgecolor='black')
+axes[0, 1].set_ylabel('Mean Maximum DTF', fontsize=12, fontweight='bold')
+axes[0, 1].set_title('Maximum DTF Values: Epilepsy vs Control', fontsize=13, fontweight='bold')
+axes[0, 1].set_xticks(x)
+axes[0, 1].set_xticklabels(band_labels, rotation=45, ha='right')
+axes[0, 1].legend(fontsize=11)
+axes[0, 1].grid(True, alpha=0.3, axis='y')
+axes[0, 1].set_ylim([0.55, 0.75])
+
+# Add difference annotations
+for i, band in enumerate(band_names):
+    diff = epilepsy_max_dtf[i] - control_max_dtf[i]
+    y_pos = max(epilepsy_max_dtf[i], control_max_dtf[i]) + 0.005
+    color = 'red' if diff > 0 else 'blue'
+    axes[0, 1].text(i, y_pos, f'{diff:+.3f}', ha='center', va='bottom', fontsize=8, color=color, fontweight='bold')
+
+# Panel 3: Mean PDC
+axes[1, 0].bar(x - width/2, epilepsy_mean_pdc, width, label='Epilepsy', color='red', alpha=0.7, edgecolor='black')
+axes[1, 0].bar(x + width/2, control_mean_pdc, width, label='Control', color='blue', alpha=0.7, edgecolor='black')
+axes[1, 0].set_ylabel('Mean PDC Value', fontsize=12, fontweight='bold')
+axes[1, 0].set_title('Average PDC Values: Epilepsy vs Control', fontsize=13, fontweight='bold')
+axes[1, 0].set_xticks(x)
+axes[1, 0].set_xticklabels(band_labels, rotation=45, ha='right')
+axes[1, 0].legend(fontsize=11)
+axes[1, 0].grid(True, alpha=0.3, axis='y')
+axes[1, 0].set_ylim([0.14, 0.18])
+
+# Add difference annotations
+for i, band in enumerate(band_names):
+    diff = epilepsy_mean_pdc[i] - control_mean_pdc[i]
+    y_pos = max(epilepsy_mean_pdc[i], control_mean_pdc[i]) + 0.001
+    color = 'red' if diff > 0 else 'blue'
+    axes[1, 0].text(i, y_pos, f'{diff:+.4f}', ha='center', va='bottom', fontsize=8, color=color, fontweight='bold')
+
+# Panel 4: Mean DTF
+axes[1, 1].bar(x - width/2, epilepsy_mean_dtf, width, label='Epilepsy', color='red', alpha=0.7, edgecolor='black')
+axes[1, 1].bar(x + width/2, control_mean_dtf, width, label='Control', color='blue', alpha=0.7, edgecolor='black')
+axes[1, 1].set_ylabel('Mean DTF Value', fontsize=12, fontweight='bold')
+axes[1, 1].set_title('Average DTF Values: Epilepsy vs Control', fontsize=13, fontweight='bold')
+axes[1, 1].set_xticks(x)
+axes[1, 1].set_xticklabels(band_labels, rotation=45, ha='right')
+axes[1, 1].legend(fontsize=11)
+axes[1, 1].grid(True, alpha=0.3, axis='y')
+axes[1, 1].set_ylim([0.14, 0.18])
+
+# Add difference annotations
+for i, band in enumerate(band_names):
+    diff = epilepsy_mean_dtf[i] - control_mean_dtf[i]
+    y_pos = max(epilepsy_mean_dtf[i], control_mean_dtf[i]) + 0.001
+    color = 'red' if diff > 0 else 'blue'
+    axes[1, 1].text(i, y_pos, f'{diff:+.4f}', ha='center', va='bottom', fontsize=8, color=color, fontweight='bold')
+
+plt.suptitle('Epilepsy vs Control: Per-Band Connectivity Comparison', 
+             fontsize=16, fontweight='bold', y=0.995)
+plt.tight_layout(rect=[0, 0, 1, 0.99])
+plt.savefig(output_dir / 'epilepsy_vs_control_per_band.png', dpi=300, bbox_inches='tight')
+print(f"✅ Saved: {output_dir / 'epilepsy_vs_control_per_band.png'}")
+
+# ============================================================================
+# PRINT PER-BAND GROUP COMPARISON STATISTICS
+# ============================================================================
+
+print("\n" + "="*80)
+print("EPILEPSY vs CONTROL: PER-BAND COMPARISON")
+print("="*80)
+print(f"\n{'Band':<12} {'Measure':<10} {'Epilepsy':<12} {'Control':<12} {'Difference':<12} {'% Diff':<10}")
+print("-" * 80)
+
+for band in band_names:
+    # Max PDC
+    epi_max_pdc = np.mean(epilepsy_band_stats[band]['max_pdc'])
+    con_max_pdc = np.mean(control_band_stats[band]['max_pdc'])
+    diff_max_pdc = epi_max_pdc - con_max_pdc
+    pct_diff_max_pdc = 100 * diff_max_pdc / con_max_pdc
+    print(f"{band:<12} {'Max PDC':<10} {epi_max_pdc:<12.4f} {con_max_pdc:<12.4f} {diff_max_pdc:<+12.4f} {pct_diff_max_pdc:<+10.2f}%")
+    
+    # Max DTF
+    epi_max_dtf = np.mean(epilepsy_band_stats[band]['max_dtf'])
+    con_max_dtf = np.mean(control_band_stats[band]['max_dtf'])
+    diff_max_dtf = epi_max_dtf - con_max_dtf
+    pct_diff_max_dtf = 100 * diff_max_dtf / con_max_dtf
+    print(f"{'':<12} {'Max DTF':<10} {epi_max_dtf:<12.4f} {con_max_dtf:<12.4f} {diff_max_dtf:<+12.4f} {pct_diff_max_dtf:<+10.2f}%")
+    print()
+
+print("="*80)
 
 plt.show()
 
 print("\n🎯 READY FOR PROFESSOR MEETING!")
-print("   Generated 3 figures:")
+print("   Generated 4 figures:")
 print("   1. connectivity_comprehensive_analysis.png - Overall statistics")
 print("   2. order_comparison_groups.png - Epilepsy vs Control")
-print("   3. per_band_connectivity_comparison.png - Multi-band analysis")
+print("   3. per_band_connectivity_comparison.png - Multi-band analysis (overall)")
+print("   4. epilepsy_vs_control_per_band.png - Multi-band analysis (group comparison) ⭐ NEW!")
