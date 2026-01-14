@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 # BIC COMPUTATION FOR SINGLE EPOCH
 # ============================================================================
 
-def compute_bic_curve(data, min_order=2, max_order=20):
+def compute_bic_curve(data, min_order=2, max_order=15):
     """
     Compute BIC values for different model orders.
     
@@ -225,7 +225,7 @@ Examples:
     parser.add_argument("--min_order", type=int, default=2,
                        help="Minimum MVAR order to test (default: 2)")
     parser.add_argument("--max_order", type=int, default=20,
-                       help="Maximum MVAR order to test (default: 20)")
+                       help="Maximum MVAR order to test (default: 15)")
     
     args = parser.parse_args()
     
