@@ -224,7 +224,7 @@ Examples:
                        help="Output directory for plots")
     parser.add_argument("--min_order", type=int, default=2,
                        help="Minimum MVAR order to test (default: 2)")
-    parser.add_argument("--max_order", type=int, default=20,
+    parser.add_argument("--max_order", type=int, default=15,
                        help="Maximum MVAR order to test (default: 15)")
     
     args = parser.parse_args()
