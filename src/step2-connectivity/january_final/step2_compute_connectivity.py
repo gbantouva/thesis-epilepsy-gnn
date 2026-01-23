@@ -11,11 +11,11 @@ FEATURES:
   - Checkpointing (stop/resume anytime)
 
 Usage:
-    # After Step 1 recommended p=13
+    # After Step 1 recommended p=15
     python step2_compute_connectivity.py \
         --input_dir F:\October-Thesis\thesis-epilepsy-gnn\data_pp_balanced \
-        --output_dir F:\October-Thesis\thesis-epilepsy-gnn\connectivity_fixed_p13 \
-        --fixed_order 13 \
+        --output_dir F:\October-Thesis\thesis-epilepsy-gnn\connectivity_fixed_p15 \
+        --fixed_order 15 \
         --workers 8
 """
 
@@ -341,18 +341,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # After Step 1 recommended p=13
+  # After Step 1 recommended p=15
   python step2_compute_connectivity.py \
       --input_dir data_pp_balanced \
-      --output_dir connectivity_fixed_p13 \
-      --fixed_order 13 \
+      --output_dir connectivity_fixed_p15 \
+      --fixed_order 15 \
       --workers 8
   
   # Resume interrupted run (same command)
   python step2_compute_connectivity.py \
       --input_dir data_pp_balanced \
-      --output_dir connectivity_fixed_p13 \
-      --fixed_order 13 \
+      --output_dir connectivity_fixed_p15 \
+      --fixed_order 15 \
       --workers 8
         """
     )
