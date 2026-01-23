@@ -106,8 +106,8 @@ Examples:
     parser.add_argument(
         "--reject_percentile", 
         type=float, 
-        default=98.0,
-        help="Percentile for adaptive rejection threshold (default: 98.0)"
+        default=95.0,
+        help="Percentile for adaptive rejection threshold (default: 95.0)"
     )
     parser.add_argument(
         "--reject_cap", 
