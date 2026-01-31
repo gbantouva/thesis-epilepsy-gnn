@@ -21,13 +21,13 @@ from tqdm import tqdm
 # ==============================================================================
 
 # Your connectivity output directory
-CONNECTIVITY_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_final_fixed_order")
+CONNECTIVITY_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_fixed_15")
 
 # Which band to analyze
 BAND_TO_ANALYZE = 'pdc_delta'  # Options: dtf_integrated, pdc_integrated, dtf_delta, etc.
 
 # Output directory
-OUTPUT_DIR = Path("group_connectivity_analysis")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\figures\january\connectivity\group_connectivity_analysis")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # Channel names
@@ -49,24 +49,24 @@ print()
 
 # Find all connectivity files
 all_files = list(CONNECTIVITY_DIR.rglob("*_graphs.npz"))
-print(f"ðŸ“ Found {len(all_files)} connectivity files")
+print(f"Found {len(all_files)} connectivity files")
 print()
 
 if len(all_files) == 0:
-    print("âŒ No connectivity files found! Make sure Step 2 is complete.")
+    print("No connectivity files found! Make sure Step 2 is complete.")
     exit()
 
 # Separate by group
 control_files = [f for f in all_files if '01_no_epilepsy' in str(f)]
 epilepsy_files = [f for f in all_files if '00_epilepsy' in str(f)]
 
-print(f"ðŸ“Š Group distribution:")
+print(f"Group distribution:")
 print(f"  Control patients: {len(control_files)} files")
 print(f"  Epilepsy patients: {len(epilepsy_files)} files")
 print()
 
 if len(control_files) == 0 or len(epilepsy_files) == 0:
-    print("âŒ One group is missing! Check your data.")
+    print("One group is missing! Check your data.")
     exit()
 
 # ==============================================================================
@@ -99,11 +99,11 @@ def load_patient_average(file_path, band_name):
         return avg_connectivity, len(connectivity)
     
     except Exception as e:
-        print(f"âš ï¸  Error loading {file_path.name}: {e}")
+        print(f"Error loading {file_path.name}: {e}")
         return None, 0
 
 
-print(f"ðŸ“Š Loading control patients...")
+print(f"Loading control patients...")
 control_matrices = []
 control_epoch_counts = []
 
@@ -113,11 +113,11 @@ for f in tqdm(control_files, desc="Control"):
         control_matrices.append(avg_conn)
         control_epoch_counts.append(n_epochs)
 
-print(f"âœ… Loaded {len(control_matrices)} control patients")
+print(f"Loaded {len(control_matrices)} control patients")
 print(f"   Total epochs: {sum(control_epoch_counts)}")
 print()
 
-print(f"ðŸ“Š Loading epilepsy patients...")
+print(f"Loading epilepsy patients...")
 epilepsy_matrices = []
 epilepsy_epoch_counts = []
 
@@ -127,7 +127,7 @@ for f in tqdm(epilepsy_files, desc="Epilepsy"):
         epilepsy_matrices.append(avg_conn)
         epilepsy_epoch_counts.append(n_epochs)
 
-print(f"âœ… Loaded {len(epilepsy_matrices)} epilepsy patients")
+print(f"Loaded {len(epilepsy_matrices)} epilepsy patients")
 print(f"   Total epochs: {sum(epilepsy_epoch_counts)}")
 print()
 
@@ -135,7 +135,7 @@ print()
 control_matrices = np.array(control_matrices)  # Shape: (n_control, 22, 22)
 epilepsy_matrices = np.array(epilepsy_matrices)  # Shape: (n_epilepsy, 22, 22)
 
-print(f"ðŸ“Š Data shapes:")
+print(f"Data shapes:")
 print(f"  Control: {control_matrices.shape}")
 print(f"  Epilepsy: {epilepsy_matrices.shape}")
 print()
@@ -144,7 +144,7 @@ print()
 # VALIDATE DIAGONAL IS ZERO
 # ==============================================================================
 
-print(f"âœ… DIAGONAL VALIDATION:")
+print(f"DIAGONAL VALIDATION:")
 
 # Check control diagonal
 control_diag = np.array([np.diag(control_matrices[i]) for i in range(len(control_matrices))])
@@ -158,16 +158,16 @@ print(f"  Control max diagonal: {max_control_diag:.6f}")
 print(f"  Epilepsy max diagonal: {max_epilepsy_diag:.6f}")
 
 if max(max_control_diag, max_epilepsy_diag) > 0.01:
-    print(f"  âš ï¸  WARNING: Diagonal not zero! Check Step 2.")
+    print(f"WARNING: Diagonal not zero! Check Step 2.")
 else:
-    print(f"  âœ… Diagonal correctly set to zero")
+    print(f"Diagonal correctly set to zero")
 print()
 
 # ==============================================================================
 # COMPUTE GROUP STATISTICS
 # ==============================================================================
 
-print(f"ðŸ“Š Computing group statistics...")
+print(f"Computing group statistics...")
 
 # Group averages
 avg_control = np.mean(control_matrices, axis=0)  # Average across patients
@@ -214,7 +214,7 @@ alpha_corrected = 0.05 / n_comparisons
 significant_mask = (p_values < alpha_corrected) & (p_values > 0)
 n_significant = np.sum(significant_mask)
 
-print(f"âœ… Statistics computed:")
+print(f"Statistics computed:")
 print(f"  T-tests performed: {n_comparisons}")
 print(f"  Bonferroni-corrected Î±: {alpha_corrected:.6f}")
 print(f"  Significant connections: {n_significant} ({n_significant/n_comparisons*100:.2f}%)")
@@ -225,7 +225,7 @@ print()
 # VISUALIZATION
 # ==============================================================================
 
-print(f"ðŸ“Š Creating visualizations...")
+print(f"Creating visualizations...")
 
 # Figure 1: Group comparison
 fig, axes = plt.subplots(1, 3, figsize=(24, 7))
@@ -314,19 +314,19 @@ print(f"GROUP-LEVEL ANALYSIS SUMMARY")
 print(f"{'='*80}")
 print(f"Band: {BAND_TO_ANALYZE}")
 print()
-print(f"ðŸ“Š Sample Sizes:")
+print(f"Sample Sizes:")
 print(f"  Control patients: {len(control_matrices)}")
 print(f"  Epilepsy patients: {len(epilepsy_matrices)}")
 print(f"  Total control epochs: {sum(control_epoch_counts)}")
 print(f"  Total epilepsy epochs: {sum(epilepsy_epoch_counts)}")
 print()
-print(f"ðŸ“ˆ Connectivity Statistics:")
+print(f"Connectivity Statistics:")
 print(f"  Control mean: {np.mean(avg_control[avg_control > 0]):.4f} Â± {np.mean(se_control[se_control > 0]):.4f}")
 print(f"  Epilepsy mean: {np.mean(avg_epilepsy[avg_epilepsy > 0]):.4f} Â± {np.mean(se_epilepsy[se_epilepsy > 0]):.4f}")
 print(f"  Max increase: {np.max(diff):.4f}")
 print(f"  Max decrease: {np.min(diff):.4f}")
 print()
-print(f"ðŸ“Š Statistical Tests:")
+print(f"Statistical Tests:")
 print(f"  Total comparisons: {n_comparisons}")
 print(f"  Bonferroni Î±: {alpha_corrected:.6f}")
 print(f"  Significant connections: {n_significant} ({n_significant/n_comparisons*100:.2f}%)")
@@ -337,7 +337,7 @@ print()
 diff_flat = diff.flatten()
 indices_sorted = np.argsort(np.abs(diff_flat))[::-1]
 
-print(f"ðŸ” TOP 10 MOST DIFFERENT CONNECTIONS:")
+print(f"TOP 10 MOST DIFFERENT CONNECTIONS:")
 count = 0
 for idx in indices_sorted:
     i = idx // n_channels
@@ -351,7 +351,7 @@ for idx in indices_sorted:
         count += 1
 print()
 
-print(f"ðŸ’¾ Saved plots to:")
+print(f"Saved plots to:")
 print(f"  - {OUTPUT_DIR / f'group_comparison_{BAND_TO_ANALYZE}.png'}")
 print(f"  - {OUTPUT_DIR / f'group_statistics_{BAND_TO_ANALYZE}.png'}")
 print(f"{'='*80}\n")
@@ -374,6 +374,6 @@ results = {
 }
 
 np.savez(OUTPUT_DIR / f'group_results_{BAND_TO_ANALYZE}.npz', **results)
-print(f"ðŸ’¾ Saved numerical results to:")
+print(f"Saved numerical results to:")
 print(f"  - {OUTPUT_DIR / f'group_results_{BAND_TO_ANALYZE}.npz'}")
 print()

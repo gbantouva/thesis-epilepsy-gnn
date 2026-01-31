@@ -5,7 +5,7 @@ from tqdm import tqdm
 # =============================================================================
 # ΡΥΘΜΙΣΗ: Βάλε τον φάκελο με τα αποτελέσματα του Step 2 (τα .npz)
 # =============================================================================
-RESULTS_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_final_fixed_order")
+RESULTS_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_fixed_15")
 
 print(f"🔍 Scanning directory: {RESULTS_DIR}")
 

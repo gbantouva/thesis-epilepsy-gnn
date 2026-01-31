@@ -46,7 +46,7 @@ def plot_epoch(data, epoch_idx, patient_id, output_dir):
     # 1. Check if epoch exists
     n_epochs = len(data['orders'])
     if epoch_idx >= n_epochs:
-        print(f"âŒ Epoch {epoch_idx} out of bounds (File has {n_epochs} epochs). Skipping.")
+        print(f"Epoch {epoch_idx} out of bounds (File has {n_epochs} epochs). Skipping.")
         return
 
     # 2. Extract Data & Find Max Value (for consistent colors)
@@ -121,7 +121,7 @@ def plot_single_band_comparison(data, epoch_idx, patient_id, output_dir, band='i
     
     n_epochs = len(data['orders'])
     if epoch_idx >= n_epochs:
-        print(f"âŒ Epoch {epoch_idx} out of bounds")
+        print(f"Epoch {epoch_idx} out of bounds")
         return
     
     dtf = data[f'dtf_{band}'][epoch_idx]
@@ -166,7 +166,7 @@ def plot_single_band_comparison(data, epoch_idx, patient_id, output_dir, band='i
     save_path = output_dir / save_name
     plt.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close()
-    print(f"âœ… Saved detailed plot: {save_name}")
+    print(f"Saved detailed plot: {save_name}")
 
 
 # ============================================================================
@@ -199,7 +199,7 @@ def main():
         print(f"Error: File not found: {file_path}")
         return
 
-    print(f"ðŸ“‚ Loading: {file_path.name}")
+    print(f"Loading: {file_path.name}")
     data = np.load(file_path)
     patient_id = file_path.stem.replace('_graphs', '')
     
@@ -234,7 +234,7 @@ def main():
         print(f"âš ï¸  Too many plots requested ({len(epochs_to_plot)}). Limiting to {args.max_plots}.")
         epochs_to_plot = epochs_to_plot[:args.max_plots]
     
-    print(f"ðŸŽ¨ Generating plots for {len(epochs_to_plot)} epochs")
+    print(f"Generating plots for {len(epochs_to_plot)} epochs")
     
     # Generate full 2x7 grid plots
     for ep in epochs_to_plot:
@@ -242,11 +242,11 @@ def main():
     
     # Generate detailed single-band plots if requested
     if args.detailed_band:
-        print(f"\nðŸ“Š Generating detailed {args.detailed_band} band plots...")
+        print(f"\nGenerating detailed {args.detailed_band} band plots...")
         for ep in epochs_to_plot:
             plot_single_band_comparison(data, ep, patient_id, output_dir, args.detailed_band)
     
-    print(f"\nâœ… Done! Images saved in: {output_dir}")
+    print(f"\Done! Images saved in: {output_dir}")
     print(f"   Generated {len(epochs_to_plot)} full plots")
     if args.detailed_band:
         print(f"   Generated {len(epochs_to_plot)} detailed {args.detailed_band} plots")

@@ -14,10 +14,10 @@ from tqdm import tqdm
 # ============================================================================
 
 # UPDATE THIS PATH TO YOUR FIXED ORDER RESULTS DIRECTORY
-RESULTS_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_final_fixed_order")
+RESULTS_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_fixed_15")
 
 # Output directory
-OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\connectivity\january_final_fixed_order\statistics_of_parallel")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\figures\january\connectivity\statistics_of_parallel")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # Band names matching your saved data
@@ -28,7 +28,7 @@ BAND_NAMES = ['integrated', 'delta', 'theta', 'alpha', 'beta', 'gamma1', 'gamma2
 # ============================================================================
 
 all_files = list(RESULTS_DIR.rglob('*_graphs.npz'))
-print(f"ðŸ“ Found {len(all_files)} result files in {RESULTS_DIR}")
+print(f"Found {len(all_files)} result files in {RESULTS_DIR}")
 
 # Storage for statistics
 stats = {
@@ -39,7 +39,7 @@ stats = {
 
 epoch_counts = {'epilepsy': 0, 'control': 0}
 
-print("ðŸ“Š Loading and calculating global statistics...")
+print("Loading and calculating global statistics...")
 
 for f in tqdm(all_files):
     try:
@@ -72,13 +72,13 @@ for f in tqdm(all_files):
             stats[group][band]['dtf'].extend(dtf_mean_vals)
             
     except Exception as e:
-        print(f"âš ï¸ Error loading {f.name}: {e}")
+        print(f"Error loading {f.name}: {e}")
 
 # ============================================================================
 # VISUALIZATION 1: GLOBAL DISTRIBUTION (HISTOGRAMS)
 # ============================================================================
 
-print("ðŸ“Š Generating Global Histograms...")
+print("Generating Global Histograms...")
 fig, axes = plt.subplots(1, 2, figsize=(15, 6))
 
 # Integrated Band - PDC
@@ -102,7 +102,7 @@ plt.close()
 # VISUALIZATION 2: EPILEPSY VS CONTROL (BAR CHARTS)
 # ============================================================================
 
-print("ðŸ“Š Generating Group Comparison Bar Charts...")
+print("Generating Group Comparison Bar Charts...")
 fig, axes = plt.subplots(2, 1, figsize=(14, 12))
 
 x = np.arange(len(BAND_NAMES))
