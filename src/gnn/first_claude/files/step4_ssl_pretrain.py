@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt
 # CONFIGURATION
 # =============================================================================
 
-GRAPHS_FILE = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\pyg_dataset\control_epilepsy_graphs.pt")
-OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\ssl_pretrained")
+GRAPHS_FILE = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\pyg_dataset\control_epilepsy_graphs.pt")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\ssl_pretrained")
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 # Check for GPU

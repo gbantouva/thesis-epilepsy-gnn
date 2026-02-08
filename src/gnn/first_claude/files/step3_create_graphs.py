@@ -23,8 +23,8 @@ from tqdm import tqdm
 # CONFIGURATION
 # =============================================================================
 
-FEATURES_FILE = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\control_epilepsy_features.npz")
-OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\pyg_dataset")
+FEATURES_FILE = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\control_epilepsy_features.npz")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\pyg_dataset")
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 # Graph options
