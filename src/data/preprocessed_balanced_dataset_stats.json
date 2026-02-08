@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-01-20T22:18:49.004105",
+  "data_directory": "F:\\October-Thesis\\thesis-epilepsy-gnn\\data_pp_balanced",
+  "epilepsy": {
+    "patients": 100,
+    "sessions": 135,
+    "files": 391,
+    "total_epochs": 106838,
+    "avg_epochs_per_file": 273.24,
+    "min_epochs_per_file": 1,
+    "max_epochs_per_file": 7678
+  },
+  "control": {
+    "patients": 100,
+    "sessions": 168,
+    "files": 471,
+    "total_epochs": 86400,
+    "avg_epochs_per_file": 183.44,
+    "min_epochs_per_file": 1,
+    "max_epochs_per_file": 2773
+  },
+  "total": {
+    "patients": 200,
+    "sessions": 303,
+    "files": 862,
+    "total_epochs": 193238,
+    "avg_epochs_per_file": 224.17
+  },
+  "class_balance": {
+    "epilepsy_epochs": 106838,
+    "control_epochs": 86400,
+    "ratio": 1.24
+  }
+}
