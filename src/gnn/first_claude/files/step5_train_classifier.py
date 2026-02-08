@@ -32,9 +32,9 @@ import json
 # CONFIGURATION
 # =============================================================================
 
-DATA_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\pyg_dataset")
-SSL_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\ssl_pretrained")
-OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\control_vs_epilepsy\classifier")
+DATA_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\pyg_dataset")
+SSL_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\ssl_pretrained")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\classifier")
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
