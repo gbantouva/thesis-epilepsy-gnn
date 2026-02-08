@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-01-20T16:10:10.214340",
+  "data_directory": "F:\\October-Thesis\\thesis-epilepsy-gnn\\data_raw_balanced\\DATA",
+  "epoch_duration_sec": 4.0,
+  "epilepsy": {
+    "patients": 100,
+    "sessions": 135,
+    "files": 399,
+    "total_duration_hours": 125.27,
+    "avg_session_minutes": 55.67,
+    "total_epochs_estimated": 112739
+  },
+  "control": {
+    "patients": 100,
+    "sessions": 168,
+    "files": 513,
+    "total_duration_hours": 101.49,
+    "avg_session_minutes": 36.25,
+    "total_epochs_estimated": 91342
+  },
+  "total": {
+    "patients": 200,
+    "sessions": 303,
+    "files": 912,
+    "total_duration_hours": 226.76,
+    "avg_session_minutes": 44.9,
+    "total_epochs_estimated": 204081
+  }
+}
