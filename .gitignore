@@ -41,3 +41,10 @@ data_raw_balanced/
 analysis_results/
 
 analysis_results_balanced/
+src/step2-connectivity/claude/test_install.py
+src/step2-connectivity/claude/connectivity_analysis.py
+src/step2-connectivity/claude/connectivity_batch.py
+src/step2-connectivity/claude/compare_groups.py
+src/step2-connectivity/claude/QUICK_REFERENCE.md
+/gnn
+/src/gnn/first_claude/wrong_files
