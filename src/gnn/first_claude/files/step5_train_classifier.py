@@ -34,7 +34,7 @@ import json
 
 DATA_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\pyg_dataset")
 SSL_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\ssl_pretrained")
-OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\control_vs_epilepsy\classifier")
+OUTPUT_DIR = Path(r"F:\October-Thesis\thesis-epilepsy-gnn\gnn\var_changed\control_vs_epilepsy\classifier")
 OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -43,22 +43,30 @@ print(f"Using device: {DEVICE}")
 # Hyperparameters
 BATCH_SIZE = 64
 EPOCHS = 50
-LEARNING_RATE = 0.0005
+#LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.0001  # ← 5x slower!
 HIDDEN_DIM = 64
+#HIDDEN_DIM = 32
 NUM_CLASSES = 2
-WEIGHT_DECAY = 1e-4
-PATIENCE = 10
+#WEIGHT_DECAY = 1e-4
+WEIGHT_DECAY = 1e-3
+#PATIENCE = 10
+PATIENCE = 20
 MIN_DELTA = 0.001
 
 # Data augmentation
 USE_AUGMENTATION = True
-EDGE_DROP_RATE = 0.3
-FEATURE_NOISE_STD = 0.05
-FEATURE_MASK_RATE = 0.2
+#EDGE_DROP_RATE = 0.3
+#FEATURE_NOISE_STD = 0.05
+#FEATURE_MASK_RATE = 0.2
+
+EDGE_DROP_RATE = 0.5      # ← Drop 50% of edges!
+FEATURE_MASK_RATE = 0.4   # ← Mask 40% of features!
+FEATURE_NOISE_STD = 0.1   # ← Double the noise!
 
 # Model settings
 USE_PRETRAINED = True
-FREEZE_ENCODER = False
+FREEZE_ENCODER = True
 
 # Reproducibility
 SEED = 42
@@ -85,12 +93,12 @@ class GNNEncoder(nn.Module):
         x = self.conv1(x, edge_index)
         x = self.bn1(x)
         x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
-        
+        #x = F.dropout(x, p=0.5, training=self.training)
+        x = F.dropout(x, p=0.7, training=self.training)
         x = self.conv2(x, edge_index)
         x = self.bn2(x)
-        x = F.dropout(x, p=0.3, training=self.training)
-        
+        #x = F.dropout(x, p=0.3, training=self.training)
+        x = F.dropout(x, p=0.5, training=self.training)
         if batch is not None:
             x = global_mean_pool(x, batch)
         else:
@@ -108,7 +116,7 @@ class EpilepsyClassifier(nn.Module):
         
         # Simple classifier head
         self.classifier = nn.Sequential(
-            nn.Dropout(0.3),
+            nn.Dropout(0.5),
             nn.Linear(hidden_channels, num_classes)
         )
     
@@ -279,9 +287,22 @@ if __name__ == "__main__":
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"\nModel: {total_params:,} total parameters, {trainable_params:,} trainable")
     
-    # Optimizer & criterion
+    # After loading data and calculating class weights:
+
+    from sklearn.utils.class_weight import compute_class_weight
+    train_labels = [data.y.item() for data in train_data]
+    #class_weights = compute_class_weight('balanced', classes=[0, 1], y=train_labels)
+    class_weights = compute_class_weight('balanced', classes=np.array([0, 1]), y=train_labels)
+    class_weights = torch.FloatTensor(class_weights).to(DEVICE)
+
+    # Optimizer & criterion with label smoothing
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)  # ← Added smoothing
+
+    # Optimizer & criterion
+    #optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    #criterion = nn.CrossEntropyLoss()
+    #criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='max', factor=0.3, patience=3, verbose=True
     )
@@ -405,7 +426,7 @@ if __name__ == "__main__":
     
     # 1. Training history
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    
+
     axes[0].plot(history['train_loss'], 'b-', linewidth=2, label='Train', alpha=0.8)
     axes[0].plot(history['val_loss'], 'r-', linewidth=2, label='Val', alpha=0.8)
     axes[0].set_xlabel('Epoch')
