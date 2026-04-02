@@ -685,8 +685,10 @@ def main():
     models = {
         'Random Forest': RandomForestClassifier(
             n_estimators=300,
-            max_depth=8,
-            min_samples_leaf=10,
+            #max_depth=8,
+            max_depth=6, #version 2
+            #min_samples_leaf=10,
+            min_samples_leaf=50, #version 2
             max_features='sqrt',
             class_weight='balanced',
             random_state=42,
@@ -694,7 +696,8 @@ def main():
         ),
         'SVM RBF': SVC(
             kernel='rbf',
-            C=0.1,
+            #C=0.1,
+            C=0.01, #version2
             gamma='scale',
             class_weight='balanced',
             probability=True,
